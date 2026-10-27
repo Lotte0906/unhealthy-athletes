@@ -1,33 +1,37 @@
+# documentation used:
+# https://www.mediawiki.org/wiki/Wikibase/API
+# https://www.mediawiki.org/wiki/API:Presenting_Wikidata_knowledge
+# https://www.mediawiki.org/wiki/API:Query
+# https://www.wikidata.org/wiki/Special:ApiSandbox
+
 import requests
-
-search_person() — find possible Wikidata entities.
-get_entity_claims() — retrieve the claims for a chosen entity.
-extract_date() — extract a date from a claim.
-get_person_dates() — coordinate the process and return the result.
-
-def get_person_dates(person_name):
-
-
 from typing import TypedDict
-
 
 class PersonEntry(TypedDict):
     name: str
     qid: str | None
     birthdate: str | None
     deathdate: str | None
+    status: str | None
+    mannerofdeath: str | None
     errormessage: str | None
 
-    
-def find_wikidata_entry(person_name):
-    base_url = "https://www.wikidata.org/w/api.php"
-    
-    # SYSTEM HYGIENE HEADERS: Explicitly identifying our scraper to avoid server drop rules
-    headers = {
+# SYSTEM HYGIENE HEADERS: Explicitly identifying our scraper to avoid server drop rules
+HEADERS = {
         "User-Agent": "ResearchDataExtractionTool/3.0 (lottee0906@gmail.com) Python-requests/2.31.0",
-        "Accept": "application/json"
-    }
-    
+        "Accept": "application/json"}
+
+def find_wikidata_entry(person_name, headers=HEADERS):
+    base_url = "https://www.wikidata.org/w/api.php"
+    person_entry = {"name": person_name,
+                   "qid" : None,
+                   "birthdate" : None,
+                   "deathdate" : None,
+                   "status" : None,
+                   "mannerofdeath" : None,
+                   "errormessage" : None
+                  }
+        
     # SEARCH FOR THE PERSON TO GET THE QID
     search_params = {
         "action": "wbsearchentities",
@@ -43,87 +47,146 @@ def find_wikidata_entry(person_name):
         
         # Guard clause: catching raw HTML block pages before they hit the json decoder
         if "text/html" in response.headers.get("Content-Type", ""):
-            return {
-            "name": person_name,
-            "qid": None,
-            "birthdate": None,
-            "deathdate": None,
-            "errormessage": f"Technical Error"
-            }
+            person_entry["errormessage"] = "Technical Error"
+            return person_entry
             
         search_response = response.json()
-    except:
-        return {
-            "name": person_name,
-            "qid": None,
-            "birthdate": None,
-            "deathdate": None,
-            "errormessage": f"Technical Error"
-        }
+    except: # TODO: catch specific errors
+        person_entry["errormessage"] = "Technical Error"
+        return person_entry
     
     search_results = search_response.get("search")
     if not search_results:
-        return {
-            "name": person_name,
-            "qid": None,
-            "birthdate": None,
-            "deathdate": None,
-            "errormessage": f"No results found for {person_name}."
-        }
+        person_entry["errormessage"] = f"No results found for {person_name}."
+        return person_entry
     
     # Safely isolate the premier matching entity block
     best_match = search_results[0]     # TODO: check if the first match is the right one and find a solution.
-    qid = best_match["id"]
-    return {
-            "name": person_name,
-            "qid": qid,
-            "birthdate": None,
-            "deathdate": None,
-            "errormessage": None
-    }
-    
-def get_wikidata_claims(person_entry: PersonEntry) -> PersonEntry:
-    # FETCH CLAIMS USING THE API ---
+    person_entry["qid"] = best_match["id"]
+    return person_entry
+
+def get_entity_data(qid, headers=HEADERS):
+    """Takes a Wikidata QID and fetches the raw entity data package
+    containing both claims and sitelinks.
+    """
+        
+    base_url = "https://wikidata.org/w/api.php"
     entity_params = {
         "action": "wbgetentities",
         "ids": qid,
         "languages": "en",
-        "props": "claims",  
+        "props": "claims|sitelinks",
         "format": "json",
         "formatversion": "2"
     }
     
     try:
-        entity_response = requests.get(base_url, params=entity_params, headers=headers)
-        entity_response.raise_for_status()
-        entity_data = entity_response.json()
+        response = requests.get(base_url, params=entity_params, headers=headers, timeout=10)
+        response.raise_for_status()
+        raw_data = response.json()
         
-        claims = entity_data["entities"][qid]["claims"]
-        
-        # Extract Birthdate (Property P569)
-        try:
-            birth_raw = claims["P569"][0]["mainsnak"]["datavalue"]["value"]["time"]
-        except (KeyError, IndexError):
-            birth_raw = "Not populated on Wikidata"
-            
-        # Extract Deathdate (Property P570)
-        try:
-            death_raw = claims["P570"][0]["mainsnak"]["datavalue"]["value"]["time"]
-        except (KeyError, IndexError):
-            death_raw = "Alive / Unknown"
-            
-        return {
-            "name": person_name,
-            "qid": qid,
-            "birthdate": birth_raw,
-            "deathdate": death_raw
-            "errormessage": None
-        }
-        
-    except Exception as e:
-        return f"Step 2 (Data Claim Fetch) failed: {e}"
+        return raw_data
+    except Exception:
+        return None
 
-# Run verification tests
-print(get_person_dates("Albert Einstein"))
-print("\n--- Testing with a living person ---")
-print(get_person_dates("Keanu Reeves"))
+def check_if_alive_on_wikipedia(entity_data, headers = HEADERS):
+    """helper function that checks if the person is alive"""
+    wp_api_url = "https://en.wikipedia.org/w/api.php"
+    qid = entity_data.get('qid')
+    sitelinks = entity_data['entities'][qid].get("sitelinks", {})
+
+    if "enwiki" in sitelinks:
+        wp_title = sitelinks["enwiki"]["title"]  
+    else:
+        wp_title = None
+    
+    wp_params = {
+        "action": "query",
+        "titles": wp_title,
+        "prop": "categories",
+        "clcategories": "Category:Living people",
+        "format": "json"
+    }
+    try:
+        response = requests.get(wp_api_url, params=wp_params, headers=headers, timeout=10)
+        response.raise_for_status()
+        wp_data = response.json()
+        pages = wp_data.get("query", {}).get("pages", {})
+        page_values= list(pages.values())[0]
+        if "categories" in page_values:
+            return "Alive"
+        return None
+    except Exception:
+        return None
+    
+def get_label_from_qid(qid, headers=HEADERS):
+    """Takes a Wikidata QID (e.g., Q2256736) and fetches its English text label."""
+    if not qid or not str(qid).startswith("Q"):
+        return None
+    
+    base_url = "https://www.wikidata.org/w/api.php"
+      
+    label_params = {
+        "action": "wbgetentities",
+        "ids": qid,
+        "languages": "en",
+        "props": "labels",
+        "format": "json",
+        "formatversion": "2"
+    }
+    
+    try:
+        response = requests.get(base_url, params=label_params, headers=headers, timeout=10)
+        response.raise_for_status()
+        label_data = response.json()
+        
+        label = label_data["entities"][qid]["labels"]["en"]["value"]
+        return label
+    except Exception:
+        return None
+    
+def get_wikidata_claims(person_entry: PersonEntry, headers=HEADERS) -> PersonEntry:
+    """"extracts date of birth, date of death, status and manner of death from wikidata using the persons QID"""
+    if person_entry['qid'] == None:
+        return person_entry
+    raw_data = get_entity_data(person_entry['qid'], headers=headers)
+    claims = raw_data["entities"][person_entry['qid']]["claims"]
+    base_url = "https://www.wikidata.org/w/api.php"
+    if claims == {}:
+        person_entry["birthdate"] = None
+        person_entry["deathdate"] = None
+        person_entry["mannerofdeath"] = None
+        person_entry["status"] = None
+        return (person_entry)
+    
+    # Extract Birthdate (Property P569)
+    try:
+        person_entry["birthdate"] = claims["P569"][0]["mainsnak"]["datavalue"]["value"]["time"]
+    except (KeyError, IndexError):
+        person_entry["birthdate"] = None
+
+    # Extract Deathdate (Property P570)
+    try:
+        person_entry["deathdate"] = claims["P570"][0]["mainsnak"]["datavalue"]["value"]["time"]
+        person_entry["status"] = "Dead"
+    except (KeyError, IndexError):
+        person_entry["deathdate"] = None
+        raw_data['qid'] = person_entry['qid']
+        entity_data = raw_data
+        person_entry["status"] = check_if_alive_on_wikipedia(entity_data,
+                                                             headers = headers)
+
+    # Extract manner/cause of death (Property P1196/P509)
+    if person_entry["status"] == "Dead":
+        try:
+            manner_qid = claims["P1196"][0]["mainsnak"]["datavalue"]["value"]["id"]
+            person_entry["mannerofdeath"] = get_label_from_qid(manner_qid, headers)
+        except (KeyError, IndexError):
+            try:
+                manner_qid = claims["P509"][0]["mainsnak"]["datavalue"]["value"]["id"]
+                person_entry["mannerofdeath"] = get_label_from_qid(manner_qid, headers)
+            except:
+                person_entry["mannerofdeath"] = None       
+    else:
+        person_entry["mannerofdeath"] = None   
+    return (person_entry)
