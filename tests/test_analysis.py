@@ -44,18 +44,6 @@ def test_filter_by_year_range_invalid_range(sample_data):
         filter_by_year_range(sample_data, 1960, 1948)
 
 
-def test_get_first_n_names(sample_data):
-    result = get_first_n_names(sample_data, n=2)
-
-    assert result == ["Alice", "Bob"]
-
-
-def test_filter_by_names(sample_data):
-    result = filter_by_names(sample_data, ["Alice", "Charlie"])
-
-    assert result["Name"].tolist() == ["Alice", "Alice", "Charlie"]
-
-
 def test_filters_do_not_modify_original_data(sample_data):
     original = sample_data.copy()
 

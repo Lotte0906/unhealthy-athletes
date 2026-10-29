@@ -29,6 +29,8 @@ class OlympicData:
             self.data[medal_type] = (
                 self.data["Medal"] == medal_type
             ).astype(int)
+        
+        self.data["medals"] = self.data["Gold"] + self.data["Silver"] + self.data["Bronze"]
 
         self.data = self.data.drop(columns="Medal")
 
@@ -36,3 +38,4 @@ class OlympicData:
         """Load the CSV file and prepare the data."""
         self.load_data()
         self.prepare_data()
+

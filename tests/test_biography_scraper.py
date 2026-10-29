@@ -24,7 +24,7 @@ def test_find_wikidata_entry(sample_data):
                                                    'deathdate': None,
                                                    'status': None,
                                                    'mannerofdeath': None,
-                                                   'errormessage': None
+                                                   'errormessage': ""
                                                   }
 
     assert find_wikidata_entry(sample_data[1]) == {'name': 'Alberb Einstein',
@@ -33,7 +33,7 @@ def test_find_wikidata_entry(sample_data):
                                                    'deathdate': None,
                                                    'status': None,
                                                    'mannerofdeath': None,
-                                                   'errormessage': 'No results found for Alberb Einstein.'
+                                                   'errormessage': 'No results found for Alberb Einstein. '
                                                   }
     
     assert find_wikidata_entry(sample_data[2]) == {'name': 'Keanu Reeves',
@@ -42,7 +42,7 @@ def test_find_wikidata_entry(sample_data):
                                                    'deathdate': None,
                                                    'status': None,
                                                    'mannerofdeath': None,
-                                                   'errormessage': None
+                                                   'errormessage': ""
                                                   }
 
 
@@ -74,7 +74,7 @@ def test_get_wikidata_claims_einstein(monkeypatch):
         "deathdate": None,
         "status": None,
         "mannerofdeath": None,
-        "errormessage": None
+        "errormessage": ""
     }
 
     assert get_wikidata_claims(person_entry) == {
@@ -84,7 +84,7 @@ def test_get_wikidata_claims_einstein(monkeypatch):
         "deathdate": "+1955-04-18T00:00:00Z",
         "status": "Dead",
         "mannerofdeath": "natural causes",
-        "errormessage": None
+        "errormessage": ""
     }    
     
 def test_get_wikidata_claims_alberb():
@@ -95,7 +95,7 @@ def test_get_wikidata_claims_alberb():
         'deathdate': None,
         'status': None,
         'mannerofdeath': None,
-        'errormessage': 'No results found for Alberb Einstein.'
+        'errormessage': 'No results found for Alberb Einstein. '
         }
 
     assert get_wikidata_claims(person_entry) == {
@@ -105,7 +105,7 @@ def test_get_wikidata_claims_alberb():
         'deathdate': None,
         'status': None,
         'mannerofdeath': None,
-        'errormessage': 'No results found for Alberb Einstein.'
+        'errormessage': 'No results found for Alberb Einstein. '
        }
     
 def test_get_wikidata_claims_Reeves(monkeypatch):
@@ -134,7 +134,7 @@ def test_get_wikidata_claims_Reeves(monkeypatch):
         "deathdate": None,
         "status": None,
         "mannerofdeath": None,
-        "errormessage": None
+        "errormessage": ""
     }
 
     assert get_wikidata_claims(person_entry) == {
@@ -144,7 +144,7 @@ def test_get_wikidata_claims_Reeves(monkeypatch):
         'deathdate': None,
         'status': 'Alive',
         'mannerofdeath': None,
-        'errormessage': None}
+        'errormessage': ""}
     
 # integration tests    
 def test_get_wikidata_claims(sample_data):
@@ -154,7 +154,7 @@ def test_get_wikidata_claims(sample_data):
                                                                         'deathdate': '+1955-04-18T00:00:00Z',
                                                                         'status': 'Dead',
                                                                         'mannerofdeath': 'natural causes',
-                                                                        'errormessage': None
+                                                                        'errormessage': ""
                                                                        }
     
     assert get_wikidata_claims(find_wikidata_entry(sample_data[1])) == {'name': 'Alberb Einstein',
@@ -163,7 +163,7 @@ def test_get_wikidata_claims(sample_data):
                                                                         'deathdate': None,
                                                                         'status': None,
                                                                         'mannerofdeath': None,
-                                                                        'errormessage': 'No results found for Alberb Einstein.'
+                                                                        'errormessage': 'No results found for Alberb Einstein. '
                                                                        }
     
     assert get_wikidata_claims(find_wikidata_entry(sample_data[2])) == {'name': 'Keanu Reeves',
@@ -172,4 +172,4 @@ def test_get_wikidata_claims(sample_data):
                                                                         'deathdate': None,
                                                                         'status': 'Alive',
                                                                         'mannerofdeath': None,
-                                                                        'errormessage': None}
+                                                                        'errormessage': ""}

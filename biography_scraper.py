@@ -29,7 +29,7 @@ def find_wikidata_entry(person_name, headers=HEADERS):
                    "deathdate" : None,
                    "status" : None,
                    "mannerofdeath" : None,
-                   "errormessage" : None
+                   "errormessage" : ""
                   }
         
     # SEARCH FOR THE PERSON TO GET THE QID
@@ -47,17 +47,17 @@ def find_wikidata_entry(person_name, headers=HEADERS):
         
         # Guard clause: catching raw HTML block pages before they hit the json decoder
         if "text/html" in response.headers.get("Content-Type", ""):
-            person_entry["errormessage"] = "Technical Error"
+            person_entry["errormessage"] += "Technical Error "
             return person_entry
             
         search_response = response.json()
     except: # TODO: catch specific errors
-        person_entry["errormessage"] = "Technical Error"
+        person_entry["errormessage"] += "Technical Error "
         return person_entry
     
     search_results = search_response.get("search")
     if not search_results:
-        person_entry["errormessage"] = f"No results found for {person_name}."
+        person_entry["errormessage"] += f"No results found for {person_name}. "
         return person_entry
     
     # Safely isolate the premier matching entity block
@@ -89,6 +89,23 @@ def get_entity_data(qid, headers=HEADERS):
     except Exception:
         return None
 
+def check_date(date, datetype):
+    errormessage = ""
+    missing = []
+    if date[6:8] == "00":
+        date = date[0:6] + "01" + date[8:]
+        missing.append("month")
+    if date[9:11] == "00":
+        date = date[0:9] + "01" + date[11:]
+        missing.append("day")
+    if len(missing) == 1:
+           errormessage = f"{missing[0]} of { datetype} is missing "
+    if len(missing) == 2:
+        errormessage = f"{missing[0]} and {missing[1]} of { datetype} are missing "
+    return(date, errormessage)    
+    
+    
+    
 def check_if_alive_on_wikipedia(entity_data, headers = HEADERS):
     """helper function that checks if the person is alive"""
     wp_api_url = "https://en.wikipedia.org/w/api.php"
@@ -161,13 +178,17 @@ def get_wikidata_claims(person_entry: PersonEntry, headers=HEADERS) -> PersonEnt
     
     # Extract Birthdate (Property P569)
     try:
-        person_entry["birthdate"] = claims["P569"][0]["mainsnak"]["datavalue"]["value"]["time"]
+        unchecked_birthdate = claims["P569"][0]["mainsnak"]["datavalue"]["value"]["time"]
+        person_entry["birthdate"] = check_date(unchecked_birthdate, "birth")[0]
+        person_entry["errormessage"] += check_date(unchecked_birthdate, "birth")[1]
     except (KeyError, IndexError):
         person_entry["birthdate"] = None
 
     # Extract Deathdate (Property P570)
     try:
-        person_entry["deathdate"] = claims["P570"][0]["mainsnak"]["datavalue"]["value"]["time"]
+        unchecked_deathdate = claims["P570"][0]["mainsnak"]["datavalue"]["value"]["time"]
+        person_entry["deathdate"] = check_date(unchecked_deathdate, "death")[0]
+        person_entry["errormessage"] += check_date(unchecked_deathdate, "death")[1]
         person_entry["status"] = "Dead"
     except (KeyError, IndexError):
         person_entry["deathdate"] = None
