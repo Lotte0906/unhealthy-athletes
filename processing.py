@@ -3,6 +3,10 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 def convert_dict_to_pd_df(list_of_dicts):
+    try:
+        df = pd.DataFrame(list_of_dicts)
+    except Exception as e:
+
     return pd.DataFrame(list_of_dicts)
 
 def merge_dataframes(df1, df2):
@@ -16,8 +20,8 @@ def merge_dataframes(df1, df2):
     return df
 
 def convert_dates(df):
-    df['birthdate'] = pd.to_datetime(df['birthdate'], format="+%Y-%m-%dT%H:%M:%SZ").dt.date
-    df['deathdate'] = pd.to_datetime(df['deathdate'], format="+%Y-%m-%dT%H:%M:%SZ").dt.date
+    df['birthdate'] = pd.to_datetime(df['birthdate'], format="+%Y-%m-%dT%H:%M:%SZ", errors="coerce").dt.date
+    df['deathdate'] = pd.to_datetime(df['deathdate'], format="+%Y-%m-%dT%H:%M:%SZ", errors="coerce").dt.date
     return df
 
 def calculate_age_per_row(row, currentdate):

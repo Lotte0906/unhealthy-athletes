@@ -167,6 +167,9 @@ def get_wikidata_claims(person_entry: PersonEntry, headers=HEADERS) -> PersonEnt
     if person_entry['qid'] == None:
         return person_entry
     raw_data = get_entity_data(person_entry['qid'], headers=headers)
+    if raw_data is None:
+        print(f"get_entity_data returned None for QID {person_entry['qid']}")
+        return person_entry
     claims = raw_data["entities"][person_entry['qid']]["claims"]
     base_url = "https://www.wikidata.org/w/api.php"
     if claims == {}:
