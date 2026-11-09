@@ -11,14 +11,15 @@ def convert_dict_to_pd_df(list_of_dicts: list[dict]) -> pd.DataFrame:
         raise
 
 
+
 def merge_dataframes(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
-    """Left-merge Olympic rows with biography data using athlete names."""
+    """Left-merge Olympic rows with biography data using athlete IDs."""
     try:
         df = df1.merge(
             df2,
-            left_on="Name",
-            right_on="name",
+            on="ID",
             how="left",
+            validate="many_to_one"
         )
     except Exception as e:
         print(f"merge_dataframes failed: {type(e).__name__}: {e}")
@@ -26,6 +27,7 @@ def merge_dataframes(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
 
     if "name" in df.columns:
         df = df.drop(columns=["name"])
+
     return df
 
 

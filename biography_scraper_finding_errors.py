@@ -123,7 +123,7 @@ def attempt_find_wikidata_entry(person_name, headers=HEADERS):
     return person_entry
 
 def find_wikidata_entry(
-    person_name: str, headers: dict = HEADERS
+    person_name: str, headers: dict = HEADERS, errormessage: str = ""
 ) -> PersonEntry:
     """Try name variations and return the first variation that finds a QID."""
     person_entry: PersonEntry = {
@@ -135,7 +135,7 @@ def find_wikidata_entry(
         "deathdate": None,
         "status": None,
         "mannerofdeath": None,
-        "errormessage": "",
+        "errormessage": errormessage,
     }
     
     search_name = clean_person_name(person_name)
@@ -159,6 +159,7 @@ def find_wikidata_entry(
         entry = attempt_find_wikidata_entry(search_name, headers=headers)
         if entry["qid"] is not None:
             entry["name"] = person_name
+            entry["errormessage"] = person_entry["errormessage"]
             return entry
         if entry["errormessage"]:
             technical_errors.append(entry["errormessage"])
