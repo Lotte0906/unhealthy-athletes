@@ -1,8 +1,9 @@
-# coordinates loading, batching, scraping, and saving
 
-
+# Coordinates loading, batching, scraping, and saving
 
 import datetime
+from pathlib import Path
+
 import pandas as pd
 
 from olympic_data import OlympicData
@@ -110,7 +111,7 @@ def process_batch(olympic_data, batch_athletes, currentdate):
 
 
 def run_scraping(olympic_data, all_athletes, n_batches=49):
-    """Scrape athlete biographies and save the results in batches."""
+    """Scrape athlete biographies and save results in resumable batches."""
 
     total_athletes = len(all_athletes)
     currentdate = datetime.date.today()
@@ -120,6 +121,20 @@ def run_scraping(olympic_data, all_athletes, n_batches=49):
         end = (batch_num + 1) * total_athletes // n_batches
 
         batch_athletes = all_athletes.iloc[start:end]
+
+        # Define filenames for the completed and temporary files.
+        output_file = Path(
+            f"data/entries{batch_num + 1}of{n_batches}.csv"
+        )
+        temporary_file = output_file.with_suffix(".tmp")
+
+        # Skip batches that have already been completed.
+        if output_file.exists():
+            print(
+                f"Skipping batch {batch_num + 1}/{n_batches} "
+                "(already completed)"
+            )
+            continue
 
         print(
             f"Processing batch {batch_num + 1}/{n_batches} "
@@ -132,8 +147,15 @@ def run_scraping(olympic_data, all_athletes, n_batches=49):
             currentdate
         )
 
-        # Save results after each completed batch.
+        # Save to a temporary file first.
         df.to_csv(
-            f"data/entries{batch_num + 1}of{n_batches}.csv",
+            temporary_file,
             index=False
+        )
+
+        # Rename only after the file has been saved successfully.
+        temporary_file.replace(output_file)
+
+        print(
+            f"Completed batch {batch_num + 1}/{n_batches}"
         )

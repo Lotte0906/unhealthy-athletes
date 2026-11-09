@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from workflow import process_batch
-
+from workflow import run_scraping
 
 # --------------------------------------------------
 # Fixtures
@@ -234,3 +234,116 @@ def test_no_duplicate_rows_created(processed_data, test_data):
     ]
 
     assert len(processed_data) == len(expected_rows)
+
+    
+
+# --------------------------------------------------
+# Tests for run_scraping()
+# --------------------------------------------------
+
+@pytest.fixture
+def scraping_data():
+    """Small dataset containing four athletes."""
+
+    all_athletes = pd.DataFrame({
+        "ID": [1, 2, 3, 4],
+        "search_name": ["Athlete A", "Athlete B", "Athlete C", "Athlete D"]
+    })
+
+    olympic_data = pd.DataFrame({
+        "ID": [1, 2, 3, 4],
+        "Name": ["Athlete A", "Athlete B", "Athlete C", "Athlete D"]
+    })
+
+    return olympic_data, all_athletes
+
+
+@pytest.fixture
+def mock_process_batch(monkeypatch):
+    """Replace process_batch with a fake function."""
+
+    processed_batches = []
+
+    def fake_process_batch(olympic_data, batch_athletes, currentdate):
+        processed_batches.append(batch_athletes["ID"].tolist())
+
+        return pd.DataFrame({
+            "ID": batch_athletes["ID"].tolist(),
+            "qid": [f"Q{i}" for i in batch_athletes["ID"]]
+        })
+
+    monkeypatch.setattr(
+        "workflow.process_batch",
+        fake_process_batch
+    )
+
+    return processed_batches
+
+
+def test_run_scraping_saves_batches(
+    tmp_path, monkeypatch, scraping_data, mock_process_batch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+
+    olympic_data, all_athletes = scraping_data
+
+    run_scraping(olympic_data, all_athletes, n_batches=2)
+
+    assert mock_process_batch == [[1, 2], [3, 4]]
+
+    assert (tmp_path / "data/entries1of2.csv").exists()
+    assert (tmp_path / "data/entries2of2.csv").exists()
+
+    assert not (tmp_path / "data/entries1of2.tmp").exists()
+    assert not (tmp_path / "data/entries2of2.tmp").exists()
+
+
+def test_run_scraping_skips_completed_batches(
+    tmp_path, monkeypatch, scraping_data, mock_process_batch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+
+    # Pretend that the first batch was already completed.
+    (tmp_path / "data/entries1of2.csv").write_text(
+        "ID,qid\n1,Q1\n2,Q2\n"
+    )
+
+    olympic_data, all_athletes = scraping_data
+
+    run_scraping(olympic_data, all_athletes, n_batches=2)
+
+    # Only the second batch should be processed.
+    assert mock_process_batch == [[3, 4]]
+
+    assert (tmp_path / "data/entries1of2.csv").exists()
+    assert (tmp_path / "data/entries2of2.csv").exists()
+
+
+def test_run_scraping_reprocesses_incomplete_batch(
+    tmp_path, monkeypatch, scraping_data, mock_process_batch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+
+    # Simulate an interrupted save of the first batch.
+    (tmp_path / "data/entries1of2.tmp").write_text(
+        "incomplete data"
+    )
+
+    olympic_data, all_athletes = scraping_data
+
+    run_scraping(olympic_data, all_athletes, n_batches=2)
+
+    # Both batches should be processed.
+    assert mock_process_batch == [[1, 2], [3, 4]]
+
+    # The incomplete temporary file should be replaced.
+    assert (tmp_path / "data/entries1of2.csv").exists()
+    assert not (tmp_path / "data/entries1of2.tmp").exists()
+
+    result = pd.read_csv(tmp_path / "data/entries1of2.csv")
+
+    assert result["ID"].tolist() == [1, 2]
+    assert result["qid"].tolist() == ["Q1", "Q2"]
