@@ -118,6 +118,12 @@ def attempt_find_wikidata_entry(person_name, headers=HEADERS):
             person_entry["qid"] = search_results[0]["id"]
             person_entry["matched_search_name"] = person_name
 
+            if len(search_results) > 1:
+                add_error(
+                    person_entry,
+                    f"At least {len(search_results)} Wikidata search results found"
+                )
+
         return person_entry
 
     return person_entry
@@ -159,7 +165,17 @@ def find_wikidata_entry(
         entry = attempt_find_wikidata_entry(search_name, headers=headers)
         if entry["qid"] is not None:
             entry["name"] = person_name
-            entry["errormessage"] = person_entry["errormessage"]
+
+            if person_entry["errormessage"]:
+                if entry["errormessage"]:
+                    entry["errormessage"] = (
+                        person_entry["errormessage"]
+                        + " | "
+                        + entry["errormessage"]
+                    )
+                else:
+                    entry["errormessage"] = person_entry["errormessage"]
+
             return entry
         if entry["errormessage"]:
             technical_errors.append(entry["errormessage"])
