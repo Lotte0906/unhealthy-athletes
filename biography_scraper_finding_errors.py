@@ -26,12 +26,13 @@ WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 
 
-def add_error(person_entry: PersonEntry, message: str) -> None:
-    """Append an error message to a person's record and print diagnostics."""
+def add_error(person_entry: PersonEntry, message: str, print_error: bool = False) -> None:
+    """Append an error; print only when immediate attention is useful."""
     if person_entry["errormessage"]:
         person_entry["errormessage"] += " | "
     person_entry["errormessage"] += message
-    print(f"[{person_entry['name']} | QID: {person_entry['qid']}] {message}")
+    if print_error:
+        print(f"[{person_entry['name']} | QID: {person_entry['qid']}] {message}")
 
 def clean_person_name(person_name):
     """Remove a trailing parenthetical part from a person's name."""
@@ -50,7 +51,7 @@ def attempt_find_wikidata_entry(person_name, headers=HEADERS):
         "errormessage": ""
     }
 
-    url = "https://www.wikidata.org/w/api.php"
+    url = WIKIDATA_API_URL
     params = {
         "action": "wbsearchentities",
         "search": person_name,
@@ -74,10 +75,30 @@ def attempt_find_wikidata_entry(person_name, headers=HEADERS):
             response.raise_for_status()
             search_response = response.json()
 
+        except (requests.ConnectionError, requests.Timeout) as error:
+            if attempt < max_attempts - 1:
+                wait_time = wait_times[attempt]
+                print(
+                    f"[{person_name}] Wikidata connection failed "
+                    f"({type(error).__name__}). Retrying in {wait_time} seconds "
+                    f"(attempt {attempt + 2}/{max_attempts})."
+                )
+                time.sleep(wait_time)
+                continue
+
+            add_error(
+                person_entry,
+                f"Technical error during Wikidata search after "
+                f"{max_attempts} attempts: {error}",
+                print_error=True
+            )
+            return person_entry
+
         except (requests.RequestException, ValueError) as error:
             add_error(
                 person_entry,
-                f"Technical error during Wikidata search: {error}"
+                f"Technical error during Wikidata search: {error}",
+                print_error=True
             )
             return person_entry
 
@@ -101,13 +122,15 @@ def attempt_find_wikidata_entry(person_name, headers=HEADERS):
                 add_error(
                     person_entry,
                     "Wikidata search remained too busy after "
-                    f"{max_attempts} attempts"
+                    f"{max_attempts} attempts",
+                    print_error=True
                 )
                 return person_entry
 
             add_error(
                 person_entry,
-                f"Wikidata returned unexpected response: {search_response}"
+                f"Wikidata returned unexpected response: {search_response}",
+                print_error=True
             )
             return person_entry
 
@@ -166,16 +189,12 @@ def find_wikidata_entry(
         if entry["qid"] is not None:
             entry["name"] = person_name
 
-            if person_entry["errormessage"]:
-                if entry["errormessage"]:
-                    entry["errormessage"] = (
-                        person_entry["errormessage"]
-                        + " | "
-                        + entry["errormessage"]
-                    )
-                else:
-                    entry["errormessage"] = person_entry["errormessage"]
-
+            previous_messages = [person_entry["errormessage"], *technical_errors]
+            if entry["errormessage"]:
+                previous_messages.append(entry["errormessage"])
+            entry["errormessage"] = " | ".join(
+                message for message in previous_messages if message
+            )
             return entry
         if entry["errormessage"]:
             technical_errors.append(entry["errormessage"])
@@ -193,7 +212,7 @@ def find_wikidata_entry(
 
 def get_entity_data(qid, headers=HEADERS):
     """Fetch Wikidata entity data, retrying temporary connection errors."""
-    url = "https://www.wikidata.org/w/api.php"
+    url = WIKIDATA_API_URL
     params = {
         "action": "wbgetentities",
         "ids": qid,
@@ -230,16 +249,12 @@ def get_entity_data(qid, headers=HEADERS):
             if attempt < max_attempts - 1:
                 wait_time = wait_times[attempt]
                 print(
-                    f"[QID: {qid}] Connection error: {error}. "
+                    f"[QID: {qid}] Connection failed ({type(error).__name__}). "
                     f"Retrying in {wait_time} seconds "
                     f"(attempt {attempt + 2}/{max_attempts})."
                 )
                 time.sleep(wait_time)
             else:
-                print(
-                    f"[QID: {qid}] Fetching Wikidata entity failed "
-                    f"after {max_attempts} attempts: {error}"
-                )
                 raise
 
     return None
@@ -332,15 +347,15 @@ def get_wikidata_claims(
     try:
         raw_data = get_entity_data(qid, headers=headers)
     except requests.RequestException as e:
-        add_error(person_entry, f"Fetching Wikidata entity failed: {e}")
+        add_error(person_entry, f"Fetching Wikidata entity failed: {e}", print_error=True)
         return person_entry
     except (ValueError, KeyError, TypeError) as e:
-        add_error(person_entry, f"Unexpected Wikidata entity response: {e}")
+        add_error(person_entry, f"Unexpected Wikidata entity response: {e}", print_error=True)
         return person_entry
 
     claims = raw_data["entities"][qid].get("claims", {})
     if not isinstance(claims, dict):
-        add_error(person_entry, "Wikidata claims field had an unexpected format")
+        add_error(person_entry, "Wikidata claims field had an unexpected format", print_error=True)
         return person_entry
 
     # Birth date (P569). A missing birth date is missing data, not an error.
@@ -352,7 +367,7 @@ def get_wikidata_claims(
     except (KeyError, IndexError, TypeError):
         person_entry["birthdate"] = None
     except ValueError as e:
-        add_error(person_entry, f"Could not interpret birth date: {e}")
+        add_error(person_entry, f"Could not interpret birth date: {e}", print_error=True)
         person_entry["birthdate"] = None
 
     # Death date (P570). If absent, consult the linked Wikipedia page.
@@ -371,11 +386,11 @@ def get_wikidata_claims(
                 entity_data, headers=headers
             )
         except requests.RequestException as e:
-            add_error(person_entry, f"Wikipedia living-status request failed: {e}")
+            add_error(person_entry, f"Wikipedia living-status request failed: {e}", print_error=True)
         except (ValueError, KeyError, TypeError) as e:
-            add_error(person_entry, f"Could not check Wikipedia living status: {e}")
+            add_error(person_entry, f"Could not check Wikipedia living status: {e}", print_error=True)
     except ValueError as e:
-        add_error(person_entry, f"Could not interpret death date: {e}")
+        add_error(person_entry, f"Could not interpret death date: {e}", print_error=True)
         person_entry["deathdate"] = None
 
     # Manner of death (P1196), falling back to cause of death (P509).
@@ -395,8 +410,8 @@ def get_wikidata_claims(
                     manner_qid, headers=headers
                 )
             except requests.RequestException as e:
-                add_error(person_entry, f"Could not fetch manner-of-death label: {e}")
+                add_error(person_entry, f"Could not fetch manner-of-death label: {e}", print_error=True)
             except (ValueError, KeyError, TypeError) as e:
-                add_error(person_entry, f"Could not interpret manner of death: {e}")
+                add_error(person_entry, f"Could not interpret manner of death: {e}", print_error=True)
 
     return person_entry
