@@ -1,155 +1,252 @@
 
-import re
-from datetime import date, datetime
-
 import pandas as pd
-from dateutil.relativedelta import relativedelta
+import pytest
+from datetime import date
+
+from processing import (
+    convert_dict_to_pd_df,
+    merge_dataframes,
+    convert_dates,
+    calculate_age_per_row,
+    add_age,
+)
 
 
-def convert_dict_to_pd_df(list_of_dicts: list[dict]) -> pd.DataFrame:
-    """Convert a list of person dictionaries into a DataFrame."""
-    try:
-        return pd.DataFrame(list_of_dicts)
-    except Exception as e:
-        print(f"convert_dict_to_pd_df failed: {type(e).__name__}: {e}")
-        raise
+@pytest.fixture
+def sample_dicts():
+    return [
+        {"name": "Alice", "birthdate": "1990-05-10"},
+        {"name": "Bob", "birthdate": "1985-08-20"},
+    ]
 
 
-def merge_dataframes(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
-    """Left-merge Olympic rows with biography data using athlete IDs."""
-    try:
-        df = df1.merge(
-            df2,
-            on="ID",
-            how="left",
-            validate="many_to_one",
-        )
-    except Exception as e:
-        print(f"merge_dataframes failed: {type(e).__name__}: {e}")
-        raise
-
-    if "name" in df.columns:
-        df = df.drop(columns=["name"])
-
-    return df
+@pytest.fixture
+def olympic_data():
+    return pd.DataFrame({
+        "ID": [1, 2, 1, 3],
+        "Name": ["Alice", "Bob", "Alice", "Charlie"],
+        "Year": [1948, 1952, 1956, 1960],
+    })
 
 
-def parse_wikidata_date(value) -> tuple[date | None, str | None]:
-    """Convert a Wikidata date and describe missing or invalid components.
+@pytest.fixture
+def biography_data():
+    return pd.DataFrame({
+        "ID": [1, 2],
+        "name": ["Alice", "Bob"],
+        "birthdate": [date(1930, 1, 1), date(1925, 2, 2)],
+    })
 
-    Missing or invalid month/day values are replaced with 1.
-    Years outside Python's supported range are not converted.
-    """
-    if value is None or value == "":
-        return None, None
 
-    if isinstance(value, (datetime, date)):
-        if isinstance(value, datetime):
-            return value.date(), None
-        return value, None
+@pytest.fixture
+def date_data():
+    return pd.DataFrame({
+        "birthdate": [
+            "+1990-05-10T00:00:00Z",
+            "+1985-08-20T00:00:00Z",
+        ],
+        "deathdate": [
+            "+2020-06-15T00:00:00Z",
+            None,
+        ],
+    })
 
-    if not isinstance(value, str):
-        if pd.isna(value):
-            return None, None
-        return None, "Unsupported date type"
 
-    match = re.fullmatch(
-        r"([+-]?\d+)-(\d{2})-(\d{2})(?:T.*)?",
-        value,
+
+@pytest.fixture
+def age_data():
+    return pd.DataFrame({
+        "birthdate": [
+            date(1950, 6, 15),
+            date(2000, 6, 15),
+            None,
+        ],
+        "deathdate": [
+            date(2020, 6, 14),
+            None,
+            date(2020, 1, 1),
+        ],
+        "status": [
+            "Dead",
+            "Alive",
+            "Dead",
+        ],
+    })
+
+
+
+def test_convert_dict_to_pd_df(sample_dicts):
+    result = convert_dict_to_pd_df(sample_dicts)
+
+    expected = pd.DataFrame(sample_dicts)
+
+    pd.testing.assert_frame_equal(result, expected)
+
+
+def test_convert_dict_to_pd_df_empty():
+    result = convert_dict_to_pd_df([])
+
+    assert result.empty
+
+
+def test_merge_dataframes(olympic_data, biography_data):
+    result = merge_dataframes(olympic_data, biography_data)
+
+    expected = pd.DataFrame({
+        "ID": [1, 2, 1, 3],
+        "Name": ["Alice", "Bob", "Alice", "Charlie"],
+        "Year": [1948, 1952, 1956, 1960],
+        "birthdate": [
+            date(1930, 1, 1),
+            date(1925, 2, 2),
+            date(1930, 1, 1),
+            None,
+        ],
+    })
+
+    pd.testing.assert_frame_equal(result, expected)
+
+def test_convert_dates(date_data):
+    result = convert_dates(date_data)
+
+    assert result["birthdate"].tolist() == [
+        date(1990, 5, 10),
+        date(1985, 8, 20),
+    ]
+    assert result["deathdate"].iloc[0] == date(2020, 6, 15)
+    assert pd.isna(result["deathdate"].iloc[1])
+
+    # Original Wikidata values are preserved.
+    assert result["birthdate_original"].tolist() == (
+        date_data["birthdate"].tolist()
+    )
+    assert result["deathdate_original"].tolist() == (
+        date_data["deathdate"].tolist()
     )
 
-    if not match:
-        return None, "Unexpected date format"
+    # Valid and missing dates do not produce parsing issues.
+    assert result["birthdate_date_issue"].isna().all()
+    assert result["deathdate_date_issue"].isna().all()
+    
 
-    year, month, day = map(int, match.groups())
+def test_convert_dates_missing_components():
+    df = pd.DataFrame({
+        "birthdate": [
+            "+1890-00-00T00:00:00Z",
+            "+1890-05-00T00:00:00Z",
+            "+1890-00-14T00:00:00Z",
+        ],
+        "deathdate": [None, None, None],
+    })
 
-    if not 1 <= year <= 9999:
-        return None, "Unsupported year"
+    result = convert_dates(df)
 
-    issues = []
+    assert result["birthdate"].tolist() == [
+        date(1890, 1, 1),
+        date(1890, 5, 1),
+        date(1890, 1, 14),
+    ]
 
-    if month == 0:
-        issues.append("Missing month")
-        month = 1
-    elif not 1 <= month <= 12:
-        issues.append("Invalid month")
-        month = 1
+    assert result["birthdate_date_issue"].tolist() == [
+        "Missing month; Missing day",
+        "Missing day",
+        "Missing month",
+    ]
 
-    if day == 0:
-        issues.append("Missing day")
-        day = 1
-    else:
-        try:
-            date(year, month, day)
-        except ValueError:
-            issues.append("Invalid day")
-            day = 1
+def test_convert_dates_invalid_components():
+    df = pd.DataFrame({
+        "birthdate": [
+            "+1890-13-14T00:00:00Z",
+            "+1890-02-31T00:00:00Z",
+            "+1900-02-29T00:00:00Z",
+        ],
+        "deathdate": [None, None, None],
+    })
 
-    converted_date = date(year, month, day)
-    issue_message = "; ".join(issues) if issues else None
+    result = convert_dates(df)
 
-    return converted_date, issue_message
+    assert result["birthdate"].tolist() == [
+        date(1890, 1, 14),
+        date(1890, 2, 1),
+        date(1900, 2, 1),
+    ]
 
-
-def convert_dates(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert birth/death dates and preserve original values and date issues."""
-    df = df.copy()
-
-    for column in ("birthdate", "deathdate"):
-        df[f"{column}_original"] = df[column]
-
-        parsed = df[column].map(parse_wikidata_date)
-
-        df[column] = parsed.map(lambda result: result[0])
-        df[f"{column}_date_issue"] = parsed.map(lambda result: result[1])
-
-    return df
-
-
-def calculate_age_per_row(row: pd.Series, currentdate: date) -> int | None:
-    """Calculate age at death or current age when life status is known."""
-    try:
-        birthdate = row["birthdate"]
-        deathdate = row["deathdate"]
-        status = row.get("status")
-
-        if pd.isna(birthdate):
-            return None
-
-        if pd.notna(deathdate):
-            end_date = deathdate
-
-        elif status == "Alive":
-            end_date = currentdate
-
-        else:
-            # Deceased without a usable deathdate, or unknown status.
-            return None
-
-        return relativedelta(end_date, birthdate).years
-
-    except Exception as e:
-        name = row.get("Name", "<unknown>")
-        print(
-            f"calculate_age_per_row failed for {name}: "
-            f"{type(e).__name__}: {e}"
-        )
-        raise
+    assert result["birthdate_date_issue"].tolist() == [
+        "Invalid month",
+        "Invalid day",
+        "Invalid day",
+    ]
 
 
-def add_age(df: pd.DataFrame, currentdate: date) -> pd.DataFrame:
-    """Add nullable integer ages to a DataFrame."""
-    df = df.copy()
+def test_convert_dates_bce():
+    df = pd.DataFrame({
+        "birthdate": ["-0397-01-01T00:00:00Z"],
+        "deathdate": [None],
+    })
 
-    try:
-        df["age"] = df.apply(
-            lambda row: calculate_age_per_row(row, currentdate),
-            axis=1,
-        )
-        df["age"] = df["age"].astype("Int64")
+    result = convert_dates(df)
 
-    except Exception as e:
-        print(f"add_age failed: {type(e).__name__}: {e}")
-        raise
+    assert pd.isna(result["birthdate"].iloc[0])
+    assert result["birthdate_original"].iloc[0] == (
+        "-0397-01-01T00:00:00Z"
+    )
+    assert result["birthdate_date_issue"].iloc[0] == "Unsupported year"
 
-    return df
+
+def test_convert_dates_independent_columns():
+    df = pd.DataFrame({
+        "birthdate": ["+1890-00-00T00:00:00Z"],
+        "deathdate": ["+1950-06-00T00:00:00Z"],
+    })
+
+    result = convert_dates(df)
+
+    assert result["birthdate"].iloc[0] == date(1890, 1, 1)
+    assert result["deathdate"].iloc[0] == date(1950, 6, 1)
+
+    assert result["birthdate_date_issue"].iloc[0] == (
+        "Missing month; Missing day"
+    )
+    assert result["deathdate_date_issue"].iloc[0] == "Missing day"
+
+
+def test_calculate_age_per_row_deceased():
+    row = pd.Series({
+        "birthdate": date(1950, 6, 15),
+        "deathdate": date(2020, 6, 14),
+    })
+
+    result = calculate_age_per_row(row, date(2026, 1, 1))
+
+    assert result == 69
+
+
+def test_calculate_age_per_row_alive():
+    row = pd.Series({
+        "birthdate": date(2000, 6, 15),
+        "deathdate": None,
+    })
+
+    result = calculate_age_per_row(row, date(2026, 6, 14))
+
+    assert result == 25
+
+
+def test_calculate_age_per_row_missing_birthdate():
+    row = pd.Series({
+        "birthdate": None,
+        "deathdate": date(2020, 6, 15),
+    })
+
+    result = calculate_age_per_row(row, date(2026, 1, 1))
+
+    assert result is None
+
+
+def test_add_age(age_data):
+    currentdate = date(2026, 6, 14)
+
+    result = add_age(age_data, currentdate)
+
+    assert result["age"].tolist() == [69, 25, pd.NA]
+    assert str(result["age"].dtype) == "Int64"
