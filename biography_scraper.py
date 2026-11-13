@@ -259,28 +259,6 @@ def get_entity_data(qid, headers=HEADERS):
 
     return None
 
-
-def check_date(date: str, datetype: str) -> tuple[str, str]:
-    """Replace unknown month/day values ('00') with '01' and describe them."""
-    if not isinstance(date, str) or len(date) < 11:
-        raise ValueError(f"Unexpected Wikidata {datetype} format: {date!r}")
-
-    missing = []
-    if date[6:8] == "00":
-        date = date[:6] + "01" + date[8:]
-        missing.append("month")
-    if date[9:11] == "00":
-        date = date[:9] + "01" + date[11:]
-
-    if len(missing) == 1:
-        message = f"{missing[0]} of {datetype} is missing"
-    elif len(missing) == 2:
-        message = f"{missing[0]} and {missing[1]} of {datetype} are missing"
-    else:
-        message = ""
-    return date, message
-
-
 def check_if_alive_on_wikipedia(
     entity_data: dict, headers: dict = HEADERS
 ) -> str | None:
@@ -358,40 +336,43 @@ def get_wikidata_claims(
         add_error(person_entry, "Wikidata claims field had an unexpected format", print_error=True)
         return person_entry
 
-    # Birth date (P569). A missing birth date is missing data, not an error.
+    # Birth date (P569). Preserve the original Wikidata date string.
     try:
-        raw_date = claims["P569"][0]["mainsnak"]["datavalue"]["value"]["time"]
-        person_entry["birthdate"], message = check_date(raw_date, "birth")
-        if message:
-            add_error(person_entry, message)
+        person_entry["birthdate"] = (
+            claims["P569"][0]["mainsnak"]["datavalue"]["value"]["time"]
+        )
     except (KeyError, IndexError, TypeError):
         person_entry["birthdate"] = None
-    except ValueError as e:
-        add_error(person_entry, f"Could not interpret birth date: {e}", print_error=True)
-        person_entry["birthdate"] = None
+
 
     # Death date (P570). If absent, consult the linked Wikipedia page.
     try:
-        raw_date = claims["P570"][0]["mainsnak"]["datavalue"]["value"]["time"]
-        person_entry["deathdate"], message = check_date(raw_date, "death")
+        person_entry["deathdate"] = (
+            claims["P570"][0]["mainsnak"]["datavalue"]["value"]["time"]
+        )
         person_entry["status"] = "Dead"
-        if message:
-            add_error(person_entry, message)
+
     except (KeyError, IndexError, TypeError):
         person_entry["deathdate"] = None
         entity_data = dict(raw_data)
         entity_data["qid"] = qid
+
         try:
             person_entry["status"] = check_if_alive_on_wikipedia(
                 entity_data, headers=headers
             )
         except requests.RequestException as e:
-            add_error(person_entry, f"Wikipedia living-status request failed: {e}", print_error=True)
+            add_error(
+                person_entry,
+                f"Wikipedia living-status request failed: {e}",
+                print_error=True,
+            )
         except (ValueError, KeyError, TypeError) as e:
-            add_error(person_entry, f"Could not check Wikipedia living status: {e}", print_error=True)
-    except ValueError as e:
-        add_error(person_entry, f"Could not interpret death date: {e}", print_error=True)
-        person_entry["deathdate"] = None
+            add_error(
+                person_entry,
+                f"Could not check Wikipedia living status: {e}",
+                print_error=True,
+            )
 
     # Manner of death (P1196), falling back to cause of death (P509).
     if person_entry["status"] == "Dead":

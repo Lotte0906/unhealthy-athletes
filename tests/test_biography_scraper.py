@@ -40,7 +40,7 @@ def mock_wikidata_search(monkeypatch):
             return FakeResponse()
 
         monkeypatch.setattr(
-            "biography_scraper_finding_errors.requests.get",
+            "biography_scraper.requests.get",
             fake_get
         )
 
@@ -194,11 +194,11 @@ def test_get_wikidata_claims_einstein(monkeypatch, empty_person_entry):
         return "natural causes"
 
     monkeypatch.setattr(
-        "biography_scraper_finding_errors.get_entity_data",
+        "biography_scraper.get_entity_data",
         fake_get_entity_data
     )
     monkeypatch.setattr(
-        "biography_scraper_finding_errors.get_label_from_qid",
+        "biography_scraper.get_label_from_qid",
         fake_get_label_from_qid
     )
 
@@ -272,11 +272,11 @@ def test_get_wikidata_claims_reeves(monkeypatch):
         return "Alive"
 
     monkeypatch.setattr(
-        "biography_scraper_finding_errors.get_entity_data",
+        "biography_scraper.get_entity_data",
         fake_get_entity_data
     )
     monkeypatch.setattr(
-        "biography_scraper_finding_errors.check_if_alive_on_wikipedia",
+        "biography_scraper.check_if_alive_on_wikipedia",
         fake_check_if_alive_on_wikipedia
     )
 
@@ -286,4 +286,50 @@ def test_get_wikidata_claims_reeves(monkeypatch):
     assert result["deathdate"] is None
     assert result["status"] == "Alive"
     assert result["mannerofdeath"] is None
+    assert result["errormessage"] == ""
+
+
+def test_get_wikidata_claims_preserves_incomplete_dates(
+    monkeypatch, empty_person_entry
+):
+    """The scraper should return raw Wikidata dates without modifying them."""
+
+    def fake_get_entity_data(qid, headers=None):
+        return {
+            "entities": {
+                "Q937": {
+                    "claims": {
+                        "P569": [{
+                            "mainsnak": {
+                                "datavalue": {
+                                    "value": {
+                                        "time": "+1879-00-00T00:00:00Z"
+                                    }
+                                }
+                            }
+                        }],
+                        "P570": [{
+                            "mainsnak": {
+                                "datavalue": {
+                                    "value": {
+                                        "time": "+1955-04-00T00:00:00Z"
+                                    }
+                                }
+                            }
+                        }]
+                    }
+                }
+            }
+        }
+
+    monkeypatch.setattr(
+        "biography_scraper.get_entity_data",
+        fake_get_entity_data,
+    )
+
+    result = get_wikidata_claims(empty_person_entry)
+
+    assert result["birthdate"] == "+1879-00-00T00:00:00Z"
+    assert result["deathdate"] == "+1955-04-00T00:00:00Z"
+    assert result["status"] == "Dead"
     assert result["errormessage"] == ""

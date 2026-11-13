@@ -4,8 +4,8 @@ import datetime
 import pandas as pd
 import pytest
 
-from workflow import process_batch
-from workflow import run_scraping
+from workflow import process_batch, run_scraping
+
 
 # --------------------------------------------------
 # Fixtures
@@ -22,7 +22,7 @@ def test_data():
             "Jos Garca",
             "Anna Smith",
             "John Brown",
-            "Jane Doe"
+            "Jane Doe",
         ],
         "Year": [2000, 2004, 2008, 2012, 1996],
         "search_name": [
@@ -30,15 +30,15 @@ def test_data():
             "José García",
             "Anna Smith",
             "John Brown",
-            "Jane Doe"
+            "Jane Doe",
         ],
         "errormessage": [
             None,
             None,
             "No reliable name match found",
             "Multiple name matches found",
-            None
-        ]
+            None,
+        ],
     })
 
     batch_athletes = pd.DataFrame({
@@ -46,13 +46,13 @@ def test_data():
         "search_name": [
             "José García",
             "Anna Smith",
-            "John Brown"
+            "John Brown",
         ],
         "errormessage": [
             None,
             "No reliable name match found",
-            "Multiple name matches found"
-        ]
+            "Multiple name matches found",
+        ],
     })
 
     currentdate = datetime.date(2026, 1, 1)
@@ -74,20 +74,23 @@ def mock_wikidata(monkeypatch):
                 "qid": "Q101",
                 "birthdate": "1980-01-01",
                 "deathdate": "2020-01-01",
-                "new_error": None
+                "status": "Dead",
+                "new_error": None,
             },
             "Anna Smith": {
                 "qid": "Q102",
                 "birthdate": "1990-01-01",
                 "deathdate": None,
-                "new_error": "Wikidata warning"
+                "status": "Alive",
+                "new_error": "Wikidata warning",
             },
             "John Brown": {
                 "qid": None,
                 "birthdate": None,
                 "deathdate": None,
-                "new_error": "No Wikidata search results found"
-            }
+                "status": None,
+                "new_error": "No Wikidata search results found",
+            },
         }
 
         data = entries[name]
@@ -103,7 +106,8 @@ def mock_wikidata(monkeypatch):
             "qid": data["qid"],
             "birthdate": data["birthdate"],
             "deathdate": data["deathdate"],
-            "errormessage": errors
+            "status": data["status"],
+            "errormessage": errors,
         }
 
     def fake_get_wikidata_claims(person_entry):
@@ -111,12 +115,12 @@ def mock_wikidata(monkeypatch):
 
     monkeypatch.setattr(
         "workflow.find_wikidata_entry",
-        fake_find_wikidata_entry
+        fake_find_wikidata_entry,
     )
 
     monkeypatch.setattr(
         "workflow.get_wikidata_claims",
-        fake_get_wikidata_claims
+        fake_get_wikidata_claims,
     )
 
     return searched_names
@@ -131,7 +135,7 @@ def processed_data(test_data, mock_wikidata):
     return process_batch(
         olympic_data,
         batch_athletes,
-        currentdate
+        currentdate,
     )
 
 
@@ -150,7 +154,7 @@ def test_correct_search_names_used(processed_data, mock_wikidata):
     assert mock_wikidata == [
         "José García",
         "Anna Smith",
-        "John Brown"
+        "John Brown",
     ]
 
 
@@ -235,7 +239,6 @@ def test_no_duplicate_rows_created(processed_data, test_data):
 
     assert len(processed_data) == len(expected_rows)
 
-    
 
 # --------------------------------------------------
 # Tests for run_scraping()
@@ -247,12 +250,22 @@ def scraping_data():
 
     all_athletes = pd.DataFrame({
         "ID": [1, 2, 3, 4],
-        "search_name": ["Athlete A", "Athlete B", "Athlete C", "Athlete D"]
+        "search_name": [
+            "Athlete A",
+            "Athlete B",
+            "Athlete C",
+            "Athlete D",
+        ],
     })
 
     olympic_data = pd.DataFrame({
         "ID": [1, 2, 3, 4],
-        "Name": ["Athlete A", "Athlete B", "Athlete C", "Athlete D"]
+        "Name": [
+            "Athlete A",
+            "Athlete B",
+            "Athlete C",
+            "Athlete D",
+        ],
     })
 
     return olympic_data, all_athletes
@@ -269,12 +282,14 @@ def mock_process_batch(monkeypatch):
 
         return pd.DataFrame({
             "ID": batch_athletes["ID"].tolist(),
-            "qid": [f"Q{i}" for i in batch_athletes["ID"]]
+            "qid": [
+                f"Q{i}" for i in batch_athletes["ID"]
+            ],
         })
 
     monkeypatch.setattr(
         "workflow.process_batch",
-        fake_process_batch
+        fake_process_batch,
     )
 
     return processed_batches
@@ -288,7 +303,11 @@ def test_run_scraping_saves_batches(
 
     olympic_data, all_athletes = scraping_data
 
-    run_scraping(olympic_data, all_athletes, n_batches=2)
+    run_scraping(
+        olympic_data,
+        all_athletes,
+        n_batches=2,
+    )
 
     assert mock_process_batch == [[1, 2], [3, 4]]
 
@@ -312,7 +331,11 @@ def test_run_scraping_skips_completed_batches(
 
     olympic_data, all_athletes = scraping_data
 
-    run_scraping(olympic_data, all_athletes, n_batches=2)
+    run_scraping(
+        olympic_data,
+        all_athletes,
+        n_batches=2,
+    )
 
     # Only the second batch should be processed.
     assert mock_process_batch == [[3, 4]]
@@ -334,7 +357,11 @@ def test_run_scraping_reprocesses_incomplete_batch(
 
     olympic_data, all_athletes = scraping_data
 
-    run_scraping(olympic_data, all_athletes, n_batches=2)
+    run_scraping(
+        olympic_data,
+        all_athletes,
+        n_batches=2,
+    )
 
     # Both batches should be processed.
     assert mock_process_batch == [[1, 2], [3, 4]]
@@ -343,7 +370,9 @@ def test_run_scraping_reprocesses_incomplete_batch(
     assert (tmp_path / "data/entries1of2.csv").exists()
     assert not (tmp_path / "data/entries1of2.tmp").exists()
 
-    result = pd.read_csv(tmp_path / "data/entries1of2.csv")
+    result = pd.read_csv(
+        tmp_path / "data/entries1of2.csv"
+    )
 
     assert result["ID"].tolist() == [1, 2]
     assert result["qid"].tolist() == ["Q1", "Q2"]

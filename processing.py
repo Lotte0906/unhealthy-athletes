@@ -31,47 +31,93 @@ def merge_dataframes(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def convert_dates(df: pd.DataFrame) -> pd.DataFrame:
-    """Parse Wikidata date strings while preserving invalid/missing values.
 
-    errors='coerce' turns unparseable dates into NaT. This is convenient, but
-    it can also turn legitimate very old dates into missing values on pandas
-    versions using nanosecond timestamps.
-    """
+def convert_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert Wikidata dates, preserving originals and recording date issues."""
+    import re
+    from datetime import date, datetime
+
     df = df.copy()
 
-    for column in ("birthdate", "deathdate"):
-        try:
-            # Parse to Python date objects so historical dates outside pandas'
-            # nanosecond timestamp range can be represented.
-            def parse_date(value):
-                if pd.isna(value) or value == "":
-                    return None
-                if isinstance(value, str):
-                    # Wikidata values usually look like '+1875-03-14T00:00:00Z'.
-                    cleaned = value.lstrip("+")
-                    return pd.Timestamp(cleaned[:10]).date()
-                return pd.Timestamp(value).date()
+    def parse_date(value):
+        if value is None or value == "":
+            return None, None
 
-            df[column] = df[column].map(parse_date)
-        except Exception as e:
-            print(f"convert_dates failed for column '{column}': {type(e).__name__}: {e}")
-            raise
+        if not isinstance(value, str):
+            if pd.isna(value):
+                return None, None
+            if isinstance(value, (date, datetime)):
+                return value.date() if isinstance(value, datetime) else value, None
+            return None, "Unsupported date type"
+
+        match = re.fullmatch(
+            r"([+-]?\d+)-(\d{2})-(\d{2})(?:T.*)?",
+            value,
+        )
+
+        if not match:
+            return None, "Unexpected date format"
+
+        year, month, day = map(int, match.groups())
+
+        if not 1 <= year <= 9999:
+            return None, "Unsupported year"
+
+        issues = []
+
+        if month == 0:
+            issues.append("Missing month")
+            month = 1
+        elif not 1 <= month <= 12:
+            issues.append("Invalid month")
+            month = 1
+
+        if day == 0:
+            issues.append("Missing day")
+            day = 1
+        else:
+            try:
+                date(year, month, day)
+            except ValueError:
+                issues.append("Invalid day")
+                day = 1
+
+        return date(year, month, day), "; ".join(issues) or None
+
+    for column in ("birthdate", "deathdate"):
+        df[f"{column}_original"] = df[column]
+
+        parsed = df[column].map(parse_date)
+
+        df[column] = parsed.map(lambda result: result[0])
+        df[f"{column}_date_issue"] = parsed.map(lambda result: result[1])
 
     return df
 
 
+
 def calculate_age_per_row(row: pd.Series, currentdate) -> int | None:
-    """Calculate completed years of age, or None when birthdate is missing."""
+    """Calculate age using birthdate, deathdate, and known life status."""
     try:
         birthdate = row["birthdate"]
         deathdate = row["deathdate"]
+        status = row.get("status")
 
         if pd.isna(birthdate):
             return None
 
-        end_date = deathdate if pd.notna(deathdate) else currentdate
+        if pd.notna(deathdate):
+            end_date = deathdate
+
+        elif status == "Alive":
+            end_date = currentdate
+
+        else:
+            # Dead with no usable deathdate, or unknown life status.
+            return None
+
         return relativedelta(end_date, birthdate).years
+
     except Exception as e:
         name = row.get("Name", "<unknown>")
         print(
@@ -79,6 +125,7 @@ def calculate_age_per_row(row: pd.Series, currentdate) -> int | None:
             f"{type(e).__name__}: {e}"
         )
         raise
+
 
 
 def add_age(df: pd.DataFrame, currentdate) -> pd.DataFrame:
