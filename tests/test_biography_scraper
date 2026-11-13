@@ -2,7 +2,7 @@
 import pytest
 import requests
 
-from biography_scraper_finding_errors import (
+from biography_scraper import (
     attempt_find_wikidata_entry,
     find_wikidata_entry,
     get_wikidata_claims,

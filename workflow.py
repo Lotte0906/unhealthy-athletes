@@ -8,11 +8,11 @@ import pandas as pd
 
 from olympic_data import OlympicData
 from name_matching import match_athletes
-from biography_scraper_finding_errors import (
+from biography_scraper import (
     find_wikidata_entry,
     get_wikidata_claims
 )
-from processing_finding_errors import (
+from processing import (
     convert_dict_to_pd_df,
     merge_dataframes,
     convert_dates,

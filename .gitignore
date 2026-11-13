@@ -13,7 +13,9 @@ env/
 # Downloaded dataset
 data/athlete_events.csv
 data/noc_regions.csv
+data/bios.csv
 
 # personal notes
 Unhealthy athletes.ipynb
 notebooks/explore_biography_scraper.ipynb
+notebooks/wikidata_rapport_nederlands.ipynb

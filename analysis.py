@@ -1,3 +1,4 @@
+import pandas as pd
 MEDAL_TYPES = ("Bronze", "Silver", "Gold")
 
 

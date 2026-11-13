@@ -1,11 +1,9 @@
 import pandas as pd
 import pytest
 
-from filtering import (
+from analysis import (
     get_medal_winners,
     filter_by_year_range,
-    get_first_n_names,
-    filter_by_names,
 )
 
 

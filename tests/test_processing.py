@@ -23,6 +23,7 @@ def sample_dicts():
 @pytest.fixture
 def olympic_data():
     return pd.DataFrame({
+        "ID": [1, 2, 1, 3],
         "Name": ["Alice", "Bob", "Alice", "Charlie"],
         "Year": [1948, 1952, 1956, 1960],
     })
@@ -31,6 +32,7 @@ def olympic_data():
 @pytest.fixture
 def biography_data():
     return pd.DataFrame({
+        "ID": [1, 2],
         "name": ["Alice", "Bob"],
         "birthdate": [date(1930, 1, 1), date(1925, 2, 2)],
     })
@@ -84,6 +86,7 @@ def test_merge_dataframes(olympic_data, biography_data):
     result = merge_dataframes(olympic_data, biography_data)
 
     expected = pd.DataFrame({
+        "ID": [1, 2, 1, 3],
         "Name": ["Alice", "Bob", "Alice", "Charlie"],
         "Year": [1948, 1952, 1956, 1960],
         "birthdate": [
