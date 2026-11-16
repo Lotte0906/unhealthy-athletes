@@ -207,8 +207,7 @@ Previously tracked experimental notebooks were removed from Git tracking without
 The current priorities are:
 
 - [x] **Reproducibility:** Verify the exact sources of the Olympedia CSV files and complete the setup documentation. **Completed: 16 November 2026**
-- [ ] **Repository cleanup:** Review outdated notebooks and other unnecessary files.
-- [ ] **Athlete matching:** Improve name normalization and evaluate matching reliability.
+- [x] **Repository cleanup:** Review outdated notebooks, remove redundant files, organize published and personal notebooks, and update repository documentation. **Completed: 16 November 2026**- [ ] **Athlete matching:** Improve name normalization and evaluate matching reliability.
 - [ ] **Wikidata matching:** Investigate multiple candidates rather than automatically selecting the first result.
 - [ ] **Validation:** Compare improved matching results with the original baseline.
 - [ ] **Data collection:** Extend biographical coverage using the improved procedure.
