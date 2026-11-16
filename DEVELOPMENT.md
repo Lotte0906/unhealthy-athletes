@@ -187,6 +187,21 @@ This redundant copy was removed from Git tracking.
 Generated datasets are kept locally in `data/` and excluded
 from version control.
 
+### Notebook Cleanup — November 2026
+
+The notebooks were reorganized to distinguish between project documentation and personal development experiments.
+
+**Decision:**
+- Keep notebooks containing relevant analyses or useful demonstrations in the GitHub repository.
+- Keep personal experiments, exploratory code, and temporary testing notebooks locally, excluding them through `.gitignore`.
+- Avoid maintaining multiple published versions of the same analysis.
+
+The revised Wikidata quality report replaced the original and was renamed to `wikidata_quality_report.ipynb`.
+
+**Reason:** Keep the public repository focused on useful, understandable project work while preserving experimental notebooks locally for future reference.
+
+Previously tracked experimental notebooks were removed from Git tracking without deleting their local copies. Earlier versions remain accessible through Git history.
+
 ## 9. Planned Development
 
 The current priorities are:

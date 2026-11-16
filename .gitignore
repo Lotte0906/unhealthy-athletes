@@ -15,10 +15,14 @@ data/athlete_events.csv
 data/noc_regions.csv
 data/bios.csv
 
-# personal notes
+# Personal notes and experimental notebooks
 Unhealthy athletes.ipynb
 notebooks/explore_biography_scraper.ipynb
 notebooks/wikidata_rapport_nederlands.ipynb
+notebooks/Explore main file.ipynb
+notebooks/exploration.ipynb
+notebooks/explore_processing.ipynb
+notebooks/workflow_testing.ipynb
 
 # Generated data and scraping results
 data/entries*of*.csv
@@ -31,3 +35,6 @@ data/results.csv
 data/findingerrors.csv
 data/first2000.csv
 data/test_batch_100.csv
+
+# Temporary experiments in the project root
+/playground.ipynb
