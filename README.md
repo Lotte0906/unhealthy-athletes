@@ -180,7 +180,7 @@ The datasets are not included in this repository. They must be downloaded separa
 
 The Olympedia-derived files were verified against the versions used during development by comparing column names, row counts, and DataFrame contents.
 
-# 3. Run the data collection workflow
+### 3. Run the data collection workflow
 
 From the project root, run:
 
