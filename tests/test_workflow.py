@@ -1,14 +1,22 @@
 
 import datetime
+import json
 
 import pandas as pd
 import pytest
 
-from workflow import process_batch, run_scraping
+from workflow import (
+    process_batch,
+    run_scraping,
+    REQUIRED_BATCH_COLUMNS,
+)
+
+
+REFERENCE_DATE = datetime.date(2026, 1, 1)
 
 
 # --------------------------------------------------
-# Fixtures
+# Fixtures for process_batch()
 # --------------------------------------------------
 
 @pytest.fixture
@@ -55,14 +63,12 @@ def test_data():
         ],
     })
 
-    currentdate = datetime.date(2026, 1, 1)
-
-    return olympic_data, batch_athletes, currentdate
+    return olympic_data, batch_athletes, REFERENCE_DATE
 
 
 @pytest.fixture
 def mock_wikidata(monkeypatch):
-    """Replace Wikidata functions with predictable artificial results."""
+    """Replace Wikidata functions with artificial results."""
 
     searched_names = []
 
@@ -110,9 +116,6 @@ def mock_wikidata(monkeypatch):
             "errormessage": errors,
         }
 
-    def fake_get_wikidata_claims(person_entry):
-        return person_entry
-
     monkeypatch.setattr(
         "workflow.find_wikidata_entry",
         fake_find_wikidata_entry,
@@ -120,7 +123,7 @@ def mock_wikidata(monkeypatch):
 
     monkeypatch.setattr(
         "workflow.get_wikidata_claims",
-        fake_get_wikidata_claims,
+        lambda entry: entry,
     )
 
     return searched_names
@@ -128,8 +131,6 @@ def mock_wikidata(monkeypatch):
 
 @pytest.fixture
 def processed_data(test_data, mock_wikidata):
-    """Process the artificial batch without contacting Wikidata."""
-
     olympic_data, batch_athletes, currentdate = test_data
 
     return process_batch(
@@ -144,13 +145,11 @@ def processed_data(test_data, mock_wikidata):
 # --------------------------------------------------
 
 def test_only_selected_athletes_processed(processed_data):
-    # Athlete 4 is not in the selected batch.
     assert set(processed_data["ID"]) == {1, 2, 3}
     assert len(processed_data) == 4
 
 
 def test_correct_search_names_used(processed_data, mock_wikidata):
-    # Olympedia's corrected name should be used for athlete 1.
     assert mock_wikidata == [
         "José García",
         "Anna Smith",
@@ -159,7 +158,6 @@ def test_correct_search_names_used(processed_data, mock_wikidata):
 
 
 def test_existing_errors_preserved(processed_data):
-    # Existing matching errors should survive Wikidata processing.
     anna = processed_data.loc[
         processed_data["ID"] == 2
     ].iloc[0]
@@ -173,7 +171,6 @@ def test_existing_errors_preserved(processed_data):
 
 
 def test_new_errors_appended(processed_data):
-    # New Wikidata errors should be appended, not overwrite old ones.
     anna = processed_data.loc[
         processed_data["ID"] == 2
     ].iloc[0]
@@ -193,7 +190,6 @@ def test_new_errors_appended(processed_data):
 
 
 def test_merge_uses_athlete_id(processed_data):
-    # Wikidata results should be associated with the correct Kaggle ID.
     jose = processed_data.loc[
         processed_data["ID"] == 1
     ]
@@ -203,14 +199,12 @@ def test_merge_uses_athlete_id(processed_data):
 
 
 def test_age_calculated_correctly(processed_data):
-    # Age at death for José García: exactly 40 years.
     jose = processed_data.loc[
         processed_data["ID"] == 1
     ].iloc[0]
 
     assert jose["age"] == 40
 
-    # Anna Smith is alive on the artificial current date.
     anna = processed_data.loc[
         processed_data["ID"] == 2
     ].iloc[0]
@@ -219,7 +213,6 @@ def test_age_calculated_correctly(processed_data):
 
 
 def test_missing_wikidata_information(processed_data):
-    # An athlete without Wikidata results must remain in the output.
     john = processed_data.loc[
         processed_data["ID"] == 3
     ].iloc[0]
@@ -230,7 +223,6 @@ def test_missing_wikidata_information(processed_data):
 
 
 def test_no_duplicate_rows_created(processed_data, test_data):
-    # Processing should preserve the original Olympic event rows.
     olympic_data, batch_athletes, _ = test_data
 
     expected_rows = olympic_data[
@@ -241,12 +233,12 @@ def test_no_duplicate_rows_created(processed_data, test_data):
 
 
 # --------------------------------------------------
-# Tests for run_scraping()
+# Fixtures for run_scraping()
 # --------------------------------------------------
 
 @pytest.fixture
 def scraping_data():
-    """Small dataset containing four athletes."""
+    """Small dataset with four athletes."""
 
     all_athletes = pd.DataFrame({
         "ID": [1, 2, 3, 4],
@@ -273,19 +265,29 @@ def scraping_data():
 
 @pytest.fixture
 def mock_process_batch(monkeypatch):
-    """Replace process_batch with a fake function."""
+    """Replace scraping with a predictable fake implementation."""
 
     processed_batches = []
 
     def fake_process_batch(olympic_data, batch_athletes, currentdate):
-        processed_batches.append(batch_athletes["ID"].tolist())
+        ids = batch_athletes["ID"].tolist()
+        processed_batches.append(ids)
 
-        return pd.DataFrame({
-            "ID": batch_athletes["ID"].tolist(),
-            "qid": [
-                f"Q{i}" for i in batch_athletes["ID"]
-            ],
-        })
+        data = {
+            column: [None] * len(ids)
+            for column in REQUIRED_BATCH_COLUMNS
+        }
+
+        data["ID"] = ids
+        data["qid"] = [f"Q{i}" for i in ids]
+        data["birthdate"] = ["1990-01-01"] * len(ids)
+        data["deathdate"] = [None] * len(ids)
+        data["status"] = ["Alive"] * len(ids)
+        data["age"] = [36] * len(ids)
+        data["errormessage"] = [""] * len(ids)
+        data["birthdate_original"] = ["1990-01-01"] * len(ids)
+
+        return pd.DataFrame(data)
 
     monkeypatch.setattr(
         "workflow.process_batch",
@@ -295,84 +297,308 @@ def mock_process_batch(monkeypatch):
     return processed_batches
 
 
-def test_run_scraping_saves_batches(
+@pytest.fixture
+def scraping_environment(
     tmp_path, monkeypatch, scraping_data, mock_process_batch
 ):
+    """Use an isolated directory for every test."""
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
+
+    output_dir = tmp_path / "data"
+    output_dir.mkdir()
 
     olympic_data, all_athletes = scraping_data
 
-    run_scraping(
-        olympic_data,
-        all_athletes,
+    return {
+        "olympic_data": olympic_data,
+        "all_athletes": all_athletes,
+        "processed_batches": mock_process_batch,
+        "output_dir": output_dir,
+    }
+
+
+def run_test_scraping(env, **kwargs):
+    """Run scraping with a fixed date and isolated output directory."""
+    return run_scraping(
+        env["olympic_data"],
+        env["all_athletes"],
         n_batches=2,
+        reference_date=REFERENCE_DATE,
+        output_dir=env["output_dir"],
+        **kwargs,
     )
 
-    assert mock_process_batch == [[1, 2], [3, 4]]
 
-    assert (tmp_path / "data/entries1of2.csv").exists()
-    assert (tmp_path / "data/entries2of2.csv").exists()
+# --------------------------------------------------
+# Tests for saving and resuming
+# --------------------------------------------------
 
-    assert not (tmp_path / "data/entries1of2.tmp").exists()
-    assert not (tmp_path / "data/entries2of2.tmp").exists()
+def test_run_scraping_saves_batches(scraping_environment):
+    env = scraping_environment
+
+    run_test_scraping(env)
+
+    assert env["processed_batches"] == [[1, 2], [3, 4]]
+
+    for batch_number in (1, 2):
+        csv_file = env["output_dir"] / (
+            f"entries{batch_number}of2.csv"
+        )
+        metadata_file = csv_file.with_suffix(".json")
+
+        assert csv_file.exists()
+        assert metadata_file.exists()
+
+        assert not csv_file.with_suffix(".tmp").exists()
+        assert not metadata_file.with_suffix(".tmp").exists()
+
+        result = pd.read_csv(csv_file)
+
+        assert REQUIRED_BATCH_COLUMNS.issubset(result.columns)
+
+        with metadata_file.open(encoding="utf-8") as file:
+            metadata = json.load(file)
+
+        assert metadata["batch_number"] == batch_number
+        assert metadata["n_batches"] == 2
+        assert metadata["reference_date"] == "2026-01-01"
+        assert metadata["provenance_verified"] is True
+        assert metadata["legacy_adopted"] is False
+        assert len(metadata["output_hash"]) == 64
+        assert len(metadata["input_fingerprint"]) == 64
 
 
-def test_run_scraping_skips_completed_batches(
-    tmp_path, monkeypatch, scraping_data, mock_process_batch
-):
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
+def test_run_scraping_skips_completed_batches(scraping_environment):
+    env = scraping_environment
 
-    # Pretend that the first batch was already completed.
-    (tmp_path / "data/entries1of2.csv").write_text(
-        "ID,qid\n1,Q1\n2,Q2\n"
-    )
+    run_test_scraping(env)
 
-    olympic_data, all_athletes = scraping_data
+    env["processed_batches"].clear()
 
-    run_scraping(
-        olympic_data,
-        all_athletes,
-        n_batches=2,
-    )
+    run_test_scraping(env)
 
-    # Only the second batch should be processed.
-    assert mock_process_batch == [[3, 4]]
-
-    assert (tmp_path / "data/entries1of2.csv").exists()
-    assert (tmp_path / "data/entries2of2.csv").exists()
+    # No scraping should happen during the second run.
+    assert env["processed_batches"] == []
 
 
 def test_run_scraping_reprocesses_incomplete_batch(
-    tmp_path, monkeypatch, scraping_data, mock_process_batch
+    scraping_environment
 ):
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
+    env = scraping_environment
 
-    # Simulate an interrupted save of the first batch.
-    (tmp_path / "data/entries1of2.tmp").write_text(
-        "incomplete data"
-    )
+    temporary_file = env["output_dir"] / "entries1of2.tmp"
+    temporary_file.write_text("incomplete data")
 
-    olympic_data, all_athletes = scraping_data
+    run_test_scraping(env)
 
-    run_scraping(
-        olympic_data,
-        all_athletes,
-        n_batches=2,
-    )
-
-    # Both batches should be processed.
-    assert mock_process_batch == [[1, 2], [3, 4]]
-
-    # The incomplete temporary file should be replaced.
-    assert (tmp_path / "data/entries1of2.csv").exists()
-    assert not (tmp_path / "data/entries1of2.tmp").exists()
+    assert env["processed_batches"] == [[1, 2], [3, 4]]
+    assert not temporary_file.exists()
 
     result = pd.read_csv(
-        tmp_path / "data/entries1of2.csv"
+        env["output_dir"] / "entries1of2.csv"
     )
 
     assert result["ID"].tolist() == [1, 2]
     assert result["qid"].tolist() == ["Q1", "Q2"]
+
+
+# --------------------------------------------------
+# Tests for metadata validation
+# --------------------------------------------------
+
+def test_changed_reference_date_rejected(scraping_environment):
+    env = scraping_environment
+
+    run_test_scraping(env)
+    env["processed_batches"].clear()
+
+    with pytest.raises(ValueError, match="reference_date"):
+        run_scraping(
+            env["olympic_data"],
+            env["all_athletes"],
+            n_batches=2,
+            reference_date=datetime.date(2027, 1, 1),
+            output_dir=env["output_dir"],
+        )
+
+    assert env["processed_batches"] == []
+
+
+def test_changed_input_rejected(scraping_environment):
+    env = scraping_environment
+
+    run_test_scraping(env)
+    env["processed_batches"].clear()
+
+    changed_athletes = env["all_athletes"].copy()
+    changed_athletes.loc[0, "search_name"] = "Different Name"
+
+    with pytest.raises(ValueError, match="input_fingerprint"):
+        run_scraping(
+            env["olympic_data"],
+            changed_athletes,
+            n_batches=2,
+            reference_date=REFERENCE_DATE,
+            output_dir=env["output_dir"],
+        )
+
+    assert env["processed_batches"] == []
+
+
+def test_changed_processing_version_rejected(
+    scraping_environment, monkeypatch
+):
+    env = scraping_environment
+
+    run_test_scraping(env)
+    env["processed_batches"].clear()
+
+    monkeypatch.setattr(
+        "workflow.PROCESSING_VERSION",
+        999,
+    )
+
+    with pytest.raises(ValueError, match="processing_version"):
+        run_test_scraping(env)
+
+    assert env["processed_batches"] == []
+
+
+def test_modified_csv_rejected(scraping_environment):
+    env = scraping_environment
+
+    run_test_scraping(env)
+    env["processed_batches"].clear()
+
+    csv_file = env["output_dir"] / "entries1of2.csv"
+
+    # Modify a valid CSV without changing its columns or IDs.
+    df = pd.read_csv(csv_file)
+    df.loc[0, "qid"] = "Q999"
+    df.to_csv(csv_file, index=False)
+
+    with pytest.raises(ValueError, match="CSV changed"):
+        run_test_scraping(env)
+
+    assert env["processed_batches"] == []
+
+
+def test_missing_metadata_rejected(scraping_environment):
+    env = scraping_environment
+
+    run_test_scraping(env)
+    env["processed_batches"].clear()
+
+    metadata_file = env["output_dir"] / "entries1of2.json"
+    metadata_file.unlink()
+
+    with pytest.raises(ValueError, match="no metadata"):
+        run_test_scraping(env)
+
+    assert env["processed_batches"] == []
+
+
+def test_missing_csv_with_metadata_rejected(scraping_environment):
+    env = scraping_environment
+
+    run_test_scraping(env)
+    env["processed_batches"].clear()
+
+    csv_file = env["output_dir"] / "entries1of2.csv"
+    csv_file.unlink()
+
+    with pytest.raises(ValueError, match="CSV is missing"):
+        run_test_scraping(env)
+
+    assert env["processed_batches"] == []
+
+
+# --------------------------------------------------
+# Tests for CSV validation
+# --------------------------------------------------
+
+def test_missing_columns_rejected(scraping_environment):
+    env = scraping_environment
+
+    csv_file = env["output_dir"] / "entries1of2.csv"
+    csv_file.write_text("ID,qid\n1,Q1\n2,Q2\n")
+
+    with pytest.raises(ValueError, match="missing columns"):
+        run_test_scraping(env)
+
+    assert env["processed_batches"] == []
+
+
+def test_wrong_athlete_ids_rejected(scraping_environment):
+    env = scraping_environment
+
+    run_test_scraping(env)
+    env["processed_batches"].clear()
+
+    csv_file = env["output_dir"] / "entries1of2.csv"
+
+    df = pd.read_csv(csv_file)
+    df.loc[0, "ID"] = 999
+    df.to_csv(csv_file, index=False)
+
+    with pytest.raises(ValueError, match="expected athlete rows"):
+        run_test_scraping(env)
+
+    assert env["processed_batches"] == []
+
+
+# --------------------------------------------------
+# Tests for legacy batches
+# --------------------------------------------------
+
+def test_legacy_batch_requires_permission(scraping_environment):
+    env = scraping_environment
+
+    run_test_scraping(env)
+    env["processed_batches"].clear()
+
+    metadata_file = env["output_dir"] / "entries1of2.json"
+    metadata_file.unlink()
+
+    with pytest.raises(ValueError, match="no metadata"):
+        run_test_scraping(env)
+
+    assert env["processed_batches"] == []
+
+
+def test_legacy_batch_can_be_adopted(scraping_environment):
+    env = scraping_environment
+
+    # First generate a structurally valid CSV.
+    run_test_scraping(env)
+
+    metadata_file = env["output_dir"] / "entries1of2.json"
+    metadata_file.unlink()
+
+    env["processed_batches"].clear()
+
+    run_test_scraping(env, adopt_legacy=True)
+
+    # Both CSV files already exist, so no scraping is needed.
+    assert env["processed_batches"] == []
+
+    assert metadata_file.exists()
+
+    with metadata_file.open(encoding="utf-8") as file:
+        metadata = json.load(file)
+
+    assert metadata["legacy_adopted"] is True
+    assert metadata["provenance_verified"] is False
+
+
+def test_invalid_legacy_batch_not_adopted(scraping_environment):
+    env = scraping_environment
+
+    csv_file = env["output_dir"] / "entries1of2.csv"
+    csv_file.write_text("ID,qid\n1,Q1\n2,Q2\n")
+
+    with pytest.raises(ValueError, match="missing columns"):
+        run_test_scraping(env, adopt_legacy=True)
+
+    assert not csv_file.with_suffix(".json").exists()
+    assert env["processed_batches"] == []

@@ -19,3 +19,15 @@ data/bios.csv
 Unhealthy athletes.ipynb
 notebooks/explore_biography_scraper.ipynb
 notebooks/wikidata_rapport_nederlands.ipynb
+
+# Generated data and scraping results
+data/entries*of*.csv
+data/entries*of*.json
+data/olympedia_name_matches.csv
+data/olympedia_all_athletes.csv
+data/results.csv
+
+# Intermediate and experimental results
+data/findingerrors.csv
+data/first2000.csv
+data/test_batch_100.csv
