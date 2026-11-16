@@ -48,8 +48,10 @@ These questions are intended for future investigation and have not yet been answ
 The project currently uses the following sources:
 
 - **Olympic participation data:** [120 Years of Olympic History](https://www.kaggle.com/datasets/heesoo37/120-years-of-olympic-history-athletes-and-results), containing information about athletes, Olympic Games, sports, countries, and medals from 1896 to 2016.
+- **Olympedia datasets:** [Keith Galli's Olympics-Dataset](https://github.com/KeithGalli/Olympics-Dataset), containing data scraped from [Olympedia](https://www.olympedia.org/). Two files are used:
+  - `athletes/bios.csv` — Biographical information and identifiers for Olympic athletes.
+  - `results/results.csv` — Olympic event results and participation records, used together with the biographical data to help match athletes to the Kaggle dataset.
 - **Biographical information:** [Wikidata](https://www.wikidata.org/), used to retrieve athletes' birthdates, deathdates, recorded causes of death, and other identifying information.
-- **Athlete identification:** [Olympedia](https://www.olympedia.org/), used to support the identification of Olympic athletes.
 
 An important consideration is that an athlete may have participated in multiple Olympic Games, sports, or events. Individual participation records therefore do not necessarily represent unique athletes.
 
@@ -99,54 +101,86 @@ The full methodology, results, and limitations are documented in the exploratory
 
 ## Project Structure
 
-The repository contains Python modules for Olympic data processing, filtering, biographical scraping, and analysis, alongside Jupyter notebooks and automated tests.
+The project is organized into a Python package containing the core functionality, alongside datasets, Jupyter notebooks, and automated tests.
 
-The main components include:
+The main components are:
 
-- `olympic_data.py` — Loading and preparing Olympic participation data.
-- analysis.py — Filtering Olympic participation records by medal type and year, and supporting further analysis.
-- prepare_for_scraping.py — Selecting athletes for biographical data collection.- `biography_scraper.py` — Retrieving biographical information from Wikidata, including information used to detect potential identity-matching errors.
-- `processing.py` — Processing and transforming collected data.
-- `workflow.py` — Coordinating the biographical data collection pipeline, including batching, scraping, processing, and saving results.
-- `main.py` — Providing the entry point for running the data collection workflow.
-- `notebooks/` — Containing exploratory analyses and visualizations.
-- `tests/` — Containing automated tests.
+- `unhealthy_athletes/` — Python package containing the project's core functionality:
+  - `olympic_data.py` — Loading and preparing Olympic participation data.
+  - `analysis.py` — Filtering and analyzing Olympic participation records.
+  - `prepare_for_scraping.py` — Preparing athlete information for biographical data collection.
+  - `biography_scraper.py` — Retrieving biographical information from Wikidata.
+  - `processing.py` — Processing and transforming collected biographical data.
+  - `workflow.py` — Coordinating scraping, batching, validation, and saving results.
+- `main.py` — Entry point for running the data collection workflow.
+- `data/` — Input datasets and generated results, most of which are excluded from Git.
+- `notebooks/` — Exploratory analyses and visualizations.
+- `tests/` — Automated tests using pytest.
+- `requirements.txt` — Python dependencies required by the project.
+
 
 ## Requirements
 
-The project uses Python and several libraries for data processing, HTTP requests, testing, and visualization.
+The project requires Python 3 and the dependencies listed in `requirements.txt`.
 
 The main libraries include:
 
-- pandas
-- NumPy
-- requests
-- Matplotlib
-- pytest
-- Jupyter
-- python-dateutil
+- pandas and NumPy for data processing.
+- requests for retrieving information from Wikidata.
+- python-dateutil for handling dates.
+- Matplotlib for visualization.
+- pytest for automated testing.
+- JupyterLab for exploratory analysis.
 
-Additional dependencies may be required for specific notebooks.
+Install the dependencies using:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Some notebooks may require additional dependencies.
 
 ## Getting Started
 
 ### 1. Prepare the environment
 
-Install Python and the required libraries.
-
-For example, the main libraries can be installed using:
+Clone the repository and navigate to the project directory:
 
 ```bash
-python -m pip install pandas numpy requests matplotlib pytest jupyterlab python-dateutil
+git clone https://github.com/Lotte0906/unhealthy-athletes.git
+cd unhealthy-athletes
 ```
 
-### 2. Download the Olympic dataset
+Install the required Python packages:
 
-Download `athlete_events.csv` from the [Kaggle dataset page](https://www.kaggle.com/datasets/heesoo37/120-years-of-olympic-history-athletes-and-results) and place it in the `data/` directory.
+```bash
+python -m pip install -r requirements.txt
+```
 
-The dataset is not included in the repository.
+### 2. Download the datasets
 
-### 3. Run the data collection workflow
+The project requires three CSV files. Download them from the following sources:
+
+| File | Download source |
+|---|---|
+| `athlete_events.csv` | [120 Years of Olympic History (Kaggle)](https://www.kaggle.com/datasets/heesoo37/120-years-of-olympic-history-athletes-and-results) |
+| `bios.csv` | [Olympics-Dataset — athletes/bios.csv](https://github.com/KeithGalli/Olympics-Dataset/blob/master/athletes/bios.csv) |
+| `results.csv` | [Olympics-Dataset — results/results.csv](https://github.com/KeithGalli/Olympics-Dataset/blob/master/results/results.csv) |
+
+Place all three files directly inside the `data/` directory:
+
+```text
+data/
+├── athlete_events.csv
+├── bios.csv
+└── results.csv
+```
+
+The datasets are not included in this repository. They must be downloaded separately before running the data collection workflow.
+
+The Olympedia-derived files were verified against the versions used during development by comparing column names, row counts, and DataFrame contents.
+
+# 3. Run the data collection workflow
 
 From the project root, run:
 
