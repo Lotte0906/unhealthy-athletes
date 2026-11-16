@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from olympic_data import OlympicData
+from unhealthy_athletes.olympic_data import OlympicData
 
 
 @pytest.fixture

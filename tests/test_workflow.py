@@ -1,11 +1,10 @@
-
 import datetime
 import json
 
 import pandas as pd
 import pytest
 
-from workflow import (
+from unhealthy_athletes.workflow import (
     process_batch,
     run_scraping,
     REQUIRED_BATCH_COLUMNS,
@@ -117,12 +116,12 @@ def mock_wikidata(monkeypatch):
         }
 
     monkeypatch.setattr(
-        "workflow.find_wikidata_entry",
+        "unhealthy_athletes.workflow.find_wikidata_entry",
         fake_find_wikidata_entry,
     )
 
     monkeypatch.setattr(
-        "workflow.get_wikidata_claims",
+        "unhealthy_athletes.workflow.get_wikidata_claims",
         lambda entry: entry,
     )
 
@@ -290,7 +289,7 @@ def mock_process_batch(monkeypatch):
         return pd.DataFrame(data)
 
     monkeypatch.setattr(
-        "workflow.process_batch",
+        "unhealthy_athletes.workflow.process_batch",
         fake_process_batch,
     )
 
@@ -454,7 +453,7 @@ def test_changed_processing_version_rejected(
     env["processed_batches"].clear()
 
     monkeypatch.setattr(
-        "workflow.PROCESSING_VERSION",
+        "unhealthy_athletes.workflow.PROCESSING_VERSION",
         999,
     )
 

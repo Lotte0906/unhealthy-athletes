@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 from datetime import date
 
-from processing import (
+from unhealthy_athletes.processing import (
     convert_dict_to_pd_df,
     merge_dataframes,
     parse_wikidata_date,

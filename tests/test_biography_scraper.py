@@ -2,7 +2,7 @@
 import pytest
 import requests
 
-from biography_scraper import (
+from unhealthy_athletes.biography_scraper import (
     attempt_find_wikidata_entry,
     find_wikidata_entry,
     get_wikidata_claims,
@@ -40,7 +40,7 @@ def mock_wikidata_search(monkeypatch):
             return FakeResponse()
 
         monkeypatch.setattr(
-            "biography_scraper.requests.get",
+            "unhealthy_athletes.biography_scraper.requests.get",
             fake_get
         )
 
@@ -194,11 +194,11 @@ def test_get_wikidata_claims_einstein(monkeypatch, empty_person_entry):
         return "natural causes"
 
     monkeypatch.setattr(
-        "biography_scraper.get_entity_data",
+        "unhealthy_athletes.biography_scraper.get_entity_data",
         fake_get_entity_data
     )
     monkeypatch.setattr(
-        "biography_scraper.get_label_from_qid",
+        "unhealthy_athletes.biography_scraper.get_label_from_qid",
         fake_get_label_from_qid
     )
 
@@ -272,11 +272,11 @@ def test_get_wikidata_claims_reeves(monkeypatch):
         return "Alive"
 
     monkeypatch.setattr(
-        "biography_scraper.get_entity_data",
+        "unhealthy_athletes.biography_scraper.get_entity_data",
         fake_get_entity_data
     )
     monkeypatch.setattr(
-        "biography_scraper.check_if_alive_on_wikipedia",
+        "unhealthy_athletes.biography_scraper.check_if_alive_on_wikipedia",
         fake_check_if_alive_on_wikipedia
     )
 
@@ -323,7 +323,7 @@ def test_get_wikidata_claims_preserves_incomplete_dates(
         }
 
     monkeypatch.setattr(
-        "biography_scraper.get_entity_data",
+        "unhealthy_athletes.biography_scraper.get_entity_data",
         fake_get_entity_data,
     )
 

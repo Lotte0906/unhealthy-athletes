@@ -2,7 +2,7 @@
 import pytest
 import pandas as pd
 
-from name_matching import normalize_name, match_athletes
+from unhealthy_athletes.name_matching import normalize_name, match_athletes
 
 
 # --------------------------------------------------

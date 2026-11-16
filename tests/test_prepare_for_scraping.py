@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from prepare_for_scraping import (
+from unhealthy_athletes.prepare_for_scraping import (
     get_first_n_names,
     filter_by_names,
 )

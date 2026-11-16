@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from analysis import (
+from unhealthy_athletes.analysis import (
     get_medal_winners,
     filter_by_year_range,
 )

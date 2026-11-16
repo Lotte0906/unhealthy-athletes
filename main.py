@@ -1,7 +1,6 @@
-
 from datetime import date
 
-from workflow import prepare_athletes, run_scraping
+from unhealthy_athletes.workflow import prepare_athletes, run_scraping
 
 
 def main():
