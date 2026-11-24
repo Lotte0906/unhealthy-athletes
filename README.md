@@ -284,3 +284,7 @@ Planned work includes:
 - Document methodological limitations and remaining uncertainties.
 
 Preliminary analyses will be treated as exploratory rather than conclusive. The long-term goal remains to develop a reliable dataset and investigate the relationship between elite athletic participation and longevity.
+
+The detailed research questions, mathematical foundations,
+planned statistical methods, and research progress are
+documented in [RESEARCH_DESIGN.md](RESEARCH_DESIGN.md).
