@@ -8,13 +8,34 @@ This is a retrospective record, not a complete development history. Details that
 
 **Research goal:** Investigate whether Olympic athletes have different lifespans from comparable individuals in the general population.
 
-**Current priority:** Establish a reliable athlete-level dataset before drawing conclusions about longevity.
+**Current priority:** Conduct preliminary statistical analyses using the existing biographical dataset while continuing to improve data quality and matching reliability.
+
+### Development Strategy — November 2026
+
+The initial development strategy prioritized establishing a reliable athlete-level dataset before beginning longevity analysis.
+
+Following the initial data-quality assessment, the strategy was revised to allow statistical analysis and data-quality improvements to progress iteratively.
+
+**Decision:** Begin exploratory longevity analysis using the existing dataset before fully resolving the known data-quality limitations.
+
+**Reason:**
+
+- Preliminary analyses can help identify which data-quality issues have the greatest impact on statistical results.
+- Developing statistical methods early allows the analysis workflow to be refined before expanding data collection.
+- Repeating analyses with improved datasets provides an opportunity to quantify the impact of data-quality improvements.
+- The project also serves as a professional portfolio, demonstrating a broad range of data science capabilities beyond data collection and processing.
 
 **Development principles:**
+
 - Prioritize data quality and reproducibility.
+- Clearly distinguish exploratory findings from validated conclusions.
 - Preserve earlier results for comparison with improved methods.
 - Keep data collection, processing, and analysis separate where practical.
 - Use automated tests to check important functionality.
+- Develop statistical methods appropriate to the research questions and available data.
+- Maintain documentation and repository organization throughout development.
+
+The revised strategy changes the order of development without changing the overall research objective or reducing the importance of data quality.
 
 ## 2. Data Sources
 
@@ -113,6 +134,25 @@ Older batches without metadata require explicit adoption, and their original pro
 
 **Outstanding issue:** Existing batches from earlier runs must be inspected before resuming scraping. Some may not satisfy the newer validation requirements.
 
+### Scraping Configuration — November 2026
+
+The current entry point (`main.py`) runs the scraping workflow with the following settings:
+
+- `n_batches=500`
+- `reference_date=date(2026, 11, 13)`
+- `adopt_legacy=False`
+
+**Decision:** Use a fixed reference date and divide the athlete population into 500 batches.
+
+**Reason:**
+- A fixed reference date ensures that calculated ages remain consistent between runs.
+- Batch processing supports incremental data collection and resumption.
+- Requiring explicit adoption of legacy batches avoids silently accepting results whose original processing configuration cannot be verified.
+
+**Trade-off:** Changing the batch count or reference date can make existing batch results incompatible with the current configuration.
+
+**Outstanding question:** Determine which existing batches can be safely reused before continuing large-scale data collection.
+
 ## 5. Data Quality
 
 An exploratory analysis of 5,693 athletes investigated the availability and consistency of biographical information.
@@ -165,6 +205,25 @@ Local copies of the datasets and earlier results were retained.
 
 Historical Git commits may still contain files removed from the current repository.
 
+### Ongoing Repository Maintenance
+
+The GitHub repository is maintained throughout development rather than only after completing the research.
+
+At the end of each meaningful development phase, the following items should be reviewed:
+
+- `README.md`: Update project progress, methods, findings, and usage instructions.
+- `DEVELOPMENT.md`: Record important decisions, limitations, verification results, and completed tasks.
+- Published notebooks: Ensure analyses are understandable, appropriately documented, and clearly communicate their limitations.
+- Python modules: Review code organization, readability, and documentation.
+- Automated tests: Add or update tests for important functionality.
+- `requirements.txt`: Include new project dependencies.
+- Repository structure and `.gitignore`: Review the organization and tracking of newly introduced files.
+- Version control: Create meaningful commits and push completed changes to GitHub.
+
+Not every item requires modification during every development phase.
+
+**Reason:** Maintain a repository that accurately represents the current state of the project and remains understandable to external readers.
+
 ### Generated Matching Datasets
 
 The athlete-matching workflow saves two intermediate datasets:
@@ -204,14 +263,41 @@ Previously tracked experimental notebooks were removed from Git tracking without
 
 ## 9. Planned Development
 
-The current priorities are:
+## 9. Planned Development
+
+### Completed Milestones
 
 - [x] **Reproducibility:** Verify the exact sources of the Olympedia CSV files and complete the setup documentation. **Completed: 16 November 2026**
-- [x] **Repository cleanup:** Review outdated notebooks, remove redundant files, organize published and personal notebooks, and update repository documentation. **Completed: 16 November 2026**- [ ] **Athlete matching:** Improve name normalization and evaluate matching reliability.
+- [x] **Repository cleanup:** Review outdated notebooks, remove redundant files, organize published and personal notebooks, and update repository documentation.
+
+### Phase 1 — Preliminary Statistical Analysis
+
+- [ ] **Research design:** Define research questions, hypotheses, statistical methods, and inclusion criteria.
+- [ ] **Analysis dataset:** Prepare a preliminary athlete-level dataset from existing biographical results.
+- [ ] **Exploratory analysis:** Investigate demographic characteristics, missingness, and potential selection biases.
+- [ ] **Survival analysis:** Develop appropriate methods to account for censoring and selection into the Olympic athlete population.
+- [ ] **Statistical modelling:** Investigate factors associated with athlete longevity.
+- [ ] **Documentation:** Present preliminary findings, methodological decisions, and limitations.
+
+### Phase 2 — Data Quality Improvements
+
+- [ ] **Athlete matching:** Improve name normalization and evaluate matching reliability.
 - [ ] **Wikidata matching:** Investigate multiple candidates rather than automatically selecting the first result.
 - [ ] **Validation:** Compare improved matching results with the original baseline.
 - [ ] **Data collection:** Extend biographical coverage using the improved procedure.
-- [ ] **Analysis:** Investigate longevity using suitable comparison populations and statistical methods, accounting for athletes who are still alive.
+
+### Phase 3 — Evaluation and Refined Analysis
+
+- [ ] **Repeated analysis:** Apply the developed statistical methods to the improved dataset.
+- [ ] **Impact assessment:** Quantify how data-quality improvements affect statistical estimates.
+- [ ] **Sensitivity analysis:** Evaluate the robustness of findings under different assumptions and inclusion criteria.
+- [ ] **Reference populations:** Identify suitable general-population comparison data.
+- [ ] **Comparative analysis:** Investigate differences in longevity between Olympic athletes and comparable individuals in the general population.
+- [ ] **Interpretation:** Present findings, uncertainty, methodological limitations, and conclusions.
+
+These phases represent the current development roadmap rather than a strictly sequential process. Tasks may overlap or be revisited as new findings and limitations emerge.
+
+Repository maintenance, documentation, and testing are ongoing activities throughout all phases.
 
 ## 10. Maintaining This Document
 

@@ -252,17 +252,35 @@ Personal experiments, temporary tests, and development notebooks are kept locall
 
 ## Future Development
 
-The next priority is to improve the reliability of Wikidata identity matching.
+## Future Development
+
+The project follows an iterative development approach, combining statistical analysis with ongoing improvements to data quality.
+
+The next phase will focus on preliminary longevity analyses using the existing biographical dataset. These analyses will help identify relevant statistical methods, potential biases, and data-quality requirements before expanding and refining the dataset.
 
 Planned work includes:
 
+### Statistical Analysis
+
+- Investigate demographic characteristics and potential selection biases within the available athlete population.
+- Explore differences in longevity by sport, gender, medal status, and Olympic participation history.
+- Apply survival analysis to account for athletes who are still alive.
+- Develop statistical models to investigate factors associated with longevity.
+- Identify suitable general-population reference data for meaningful comparisons.
+
+### Data Quality and Validation
+
+- Improve name normalization and athlete matching between data sources.
 - Evaluate multiple Wikidata candidates rather than automatically selecting the first search result.
 - Use additional biographical and Olympic participation information to identify likely matches.
-- Compare the improved matching procedure with the initial implementation.
-- Extend biographical data collection to the remaining athletes.
-- Investigate athletes' lifespans and compare them with suitable reference populations.
-- Explore differences by sport, gender, country, and Olympic participation history.
-- Consider survival analysis to account for athletes who are still alive.
-- Assess the completeness and reliability of recorded causes of death and investigate whether the available data can support further analysis.
+- Extend biographical data collection using the improved matching procedure.
+- Assess the completeness and reliability of recorded causes of death.
 
-The long-term goal is to develop a reliable dataset and use it to investigate the relationship between elite athletic participation and longevity.
+### Evaluation and Refinement
+
+- Repeat preliminary analyses using the improved dataset.
+- Quantify the impact of data-quality improvements on statistical estimates.
+- Evaluate the robustness of findings through sensitivity analyses.
+- Document methodological limitations and remaining uncertainties.
+
+Preliminary analyses will be treated as exploratory rather than conclusive. The long-term goal remains to develop a reliable dataset and investigate the relationship between elite athletic participation and longevity.
